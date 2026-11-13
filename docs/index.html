@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Producción fotovoltaica: física + IA · Álvaro Martín Coll</title>
+<style>:root {
+  color-scheme: dark;
+  --page: #0d0d0d;
+  --surface: #1a1a19;
+  --surface-2: #232321;
+  --text-1: #f0efec;
+  --text-2: #c3c2b7;
+  --text-3: #898781;
+  --grid: #2c2c2a;
+  --axis: #383835;
+  --ring: rgba(255,255,255,0.10);
+  --s1: #3987e5;  /* blue */
+  --s2: #d95926;  /* orange */
+  --s3: #199e70;  /* aqua */
+  --good: #0ca30c;
+  --warn: #fab219;
+  --crit: #d03b3b;
+  --accent: var(--s1);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--text-1); line-height: 1.5; }
+a { color: var(--accent); }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 0 24px 64px; }
+
+/* Hero */
+.hero { position: relative; overflow: hidden; padding: 56px 0 40px; border-bottom: 1px solid var(--grid); margin-bottom: 32px; }
+.hero::before { content: ""; position: absolute; inset: -40% -10% auto auto; width: 720px; height: 720px;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--accent) 22%, transparent), transparent 70%);
+  pointer-events: none; }
+.hero canvas { position: absolute; inset: 0; width: 100%; height: 100%; opacity: .55; pointer-events: none; }
+.hero .wrap { position: relative; padding-bottom: 0; }
+.eyebrow { font-size: 13px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
+h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.08; margin: 10px 0 14px; letter-spacing: -.02em; max-width: 900px; }
+.lede { font-size: 18px; color: var(--text-2); max-width: 760px; margin: 0; }
+.tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+.tag { font-size: 12px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--ring); color: var(--text-2); background: var(--surface); }
+
+/* KPI tiles */
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin: 0 0 28px; }
+.kpi { background: var(--surface); border: 1px solid var(--ring); border-radius: 14px; padding: 18px 20px; }
+.kpi .l { font-size: 13px; color: var(--text-2); }
+.kpi .v { font-size: 34px; font-weight: 650; letter-spacing: -.02em; margin-top: 4px; }
+.kpi .d { font-size: 13px; color: var(--text-3); margin-top: 2px; }
+.kpi.hero-kpi { background: linear-gradient(140deg, color-mix(in srgb, var(--accent) 22%, var(--surface)), var(--surface)); }
+.kpi.hero-kpi .v { font-size: 52px; }
+
+/* Cards */
+.grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--ring); border-radius: 14px; padding: 20px; grid-column: span 12; min-width: 0; }
+.span-6 { grid-column: span 6; } .span-4 { grid-column: span 4; } .span-8 { grid-column: span 8; }
+@media (max-width: 860px) { .span-6, .span-4, .span-8 { grid-column: span 12; } }
+.card h2 { font-size: 17px; margin: 0 0 2px; }
+.card .sub { font-size: 13px; color: var(--text-3); margin: 0 0 14px; }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 13px; color: var(--text-2); margin: -4px 0 8px; }
+.legend i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.chip { font: inherit; font-size: 13px; padding: 5px 12px; border-radius: 999px; border: 1px solid var(--ring);
+  background: var(--surface-2); color: var(--text-2); cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+/* Story / method */
+.steps { counter-reset: s; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.step { background: var(--surface-2); border-radius: 12px; padding: 16px; font-size: 14px; color: var(--text-2); }
+.step b { display: block; color: var(--text-1); margin-bottom: 4px; }
+.step::before { counter-increment: s; content: counter(s, decimal-leading-zero); font-size: 12px; color: var(--accent); font-weight: 700; }
+.note { font-size: 13px; color: var(--text-3); }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--grid); }
+th { color: var(--text-3); font-weight: 500; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+td.num { font-variant-numeric: tabular-nums; text-align: right; }
+.footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--grid); display: flex; flex-wrap: wrap;
+  gap: 12px 24px; justify-content: space-between; font-size: 14px; color: var(--text-2); }
+.cta { display: inline-block; background: var(--accent); color: #fff; text-decoration: none; padding: 10px 18px;
+  border-radius: 10px; font-weight: 600; }
+
+/* Viz */
+.viz-tick { fill: var(--text-3); font-size: 11px; font-variant-numeric: tabular-nums; }
+.viz-label { fill: var(--text-3); font-size: 12px; }
+.viz-tip { position: fixed; z-index: 10; pointer-events: none; opacity: 0; transition: opacity .1s;
+  background: #0b0b0b; border: 1px solid var(--ring); border-radius: 8px; padding: 8px 10px; font-size: 12px;
+  color: var(--text-1); box-shadow: 0 6px 24px rgba(0,0,0,.5); }
+.viz-tip i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+.viz-bar { display: grid; grid-template-columns: 120px 1fr 96px; align-items: center; gap: 10px; padding: 5px 0; font-size: 13px; }
+.viz-bar-l { color: var(--text-2); }
+.viz-bar-t { height: 14px; }
+.viz-bar-f { display: block; height: 100%; border-radius: 0 4px 4px 0; }
+.viz-bar-v { color: var(--text-1); font-variant-numeric: tabular-nums; text-align: right; }
+.cm { display: grid; grid-template-columns: auto 1fr 1fr; gap: 4px; font-size: 13px; }
+.cm div { padding: 14px; border-radius: 8px; text-align: center; background: var(--surface-2); }
+.cm .h { background: none; color: var(--text-3); padding: 6px; }
+.cm .ok { background: color-mix(in srgb, var(--good) 28%, var(--surface)); }
+.cm .bad { background: color-mix(in srgb, var(--crit) 24%, var(--surface)); }
+.cm b { display: block; font-size: 24px; }
+.reveal { opacity: 0; transform: translateY(14px); transition: opacity .6s, transform .6s; }
+.reveal.in { opacity: 1; transform: none; }
+</style>
+<style>
+:root { --accent: #c98500; }
+.cta { color: #0b0b0b; }
+.chip[aria-pressed="true"] { color: #0b0b0b; }
+.heat { display: grid; gap: 2px; font-size: 11px; }
+.heat .c { height: 18px; border-radius: 3px; }
+.heat .n { color: var(--text-2); padding-right: 8px; white-space: nowrap; line-height: 18px; }
+.heat .flag { color: var(--text-1); font-weight: 600; }
+.scale { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-3); margin-top: 10px; }
+.scale span.g { width: 140px; height: 8px; border-radius: 4px; background: linear-gradient(90deg, #2c2c2a, #d95926); }
+</style>
+</head>
+<body>
+<header class="hero">
+  <canvas id="bg"></canvas>
+  <div class="wrap">
+    <div class="eyebrow">Caso demo · Energía fotovoltaica</div>
+    <h1>Cuánto debería producir tu planta solar, y qué inversores no lo están haciendo</h1>
+    <p class="lede">Modelo de producción esperada de una planta fotovoltaica de 22 inversores que combina física y machine learning,
+      y detecta los equipos que rinden por debajo del resto, con la energía que se pierde por ello.</p>
+    <div class="tags"><span class="tag">Modelo físico</span><span class="tag">LightGBM</span><span class="tag">Modelado híbrido</span><span class="tag">Detección de anomalías</span><span class="tag">Datos públicos</span></div>
+  </div>
+</header>
+<main class="wrap">
+  <section class="kpis reveal">
+    <div class="kpi hero-kpi"><div class="l">Energía recuperable al año (estimación)</div><div class="v" id="k-eur"></div><div class="d" id="k-eur-d"></div></div>
+    <div class="kpi"><div class="l">Error del modelo híbrido</div><div class="v" id="k-err"></div><div class="d">nRMSE sobre la potencia de la planta</div></div>
+    <div class="kpi"><div class="l">Inversores con bajo rendimiento</div><div class="v" id="k-inv"></div><div class="d" id="k-inv-d"></div></div>
+    <div class="kpi"><div class="l">Con solo 5 días de datos</div><div class="v" id="k-5"></div><div class="d">error del híbrido; el ML puro sube a <span id="k-5ml"></span></div></div>
+  </section>
+
+  <section class="grid">
+    <div class="card span-8 reveal">
+      <h2>Producción real vs modelos</h2>
+      <p class="sub">Días de test que los modelos no vieron. Elige un día; pasa el ratón para ver los valores.</p>
+      <div class="controls" id="days"></div>
+      <div class="legend"><span><i style="background:var(--text-2)"></i>Real</span><span><i style="background:var(--s1)"></i>Físico</span><span><i style="background:var(--s2)"></i>Machine learning</span><span><i style="background:var(--s3)"></i>Híbrido</span></div>
+      <div id="series"></div>
+    </div>
+    <div class="card span-4 reveal">
+      <h2>Error por modelo</h2>
+      <p class="sub">nRMSE en horas de sol (menos es mejor).</p>
+      <div class="controls"><button class="chip" id="full" aria-pressed="true">24 días de entrenamiento</button><button class="chip" id="few" aria-pressed="false">Solo 5 días</button></div>
+      <div id="err"></div>
+      <p class="note" id="err-note"></p>
+    </div>
+
+    <div class="card span-6 reveal">
+      <h2>Rendimiento de cada inversor</h2>
+      <p class="sub">Producción relativa al inversor mediano de la planta, con sol (1,00 = normal).</p>
+      <div id="rank"></div>
+    </div>
+    <div class="card span-6 reveal">
+      <h2>Día a día: dónde se pierde energía</h2>
+      <p class="sub">Déficit diario de cada inversor frente a la mediana. Cuanto más intenso, más pierde.</p>
+      <div class="heat" id="heat"></div>
+      <div class="scale">0 %<span class="g"></span>10 % o más de déficit</div>
+    </div>
+
+    <div class="card reveal">
+      <h2>Cómo se hizo</h2>
+      <p class="sub">El enfoque que uso con datos de planta reales.</p>
+      <div class="steps">
+        <div class="step"><b>Física primero</b>Potencia proporcional a la irradiancia, corregida por temperatura de módulo (−0,4 %/°C). Un solo parámetro ajustado.</div>
+        <div class="step"><b>ML sobre el residuo</b>LightGBM aprende lo que la física no explica: sombras, clipping del inversor, suciedad, hora del día.</div>
+        <div class="step"><b>Validación honesta</b>Los últimos 10 días quedan fuera del entrenamiento. Prueba extra con solo 5 días de histórico.</div>
+        <div class="step"><b>Salud de inversores</b>Cada inversor frente a sus vecinos en el mismo instante: aísla el fallo del equipo del efecto del tiempo.</div>
+      </div>
+      <p class="note" style="margin-top:14px">El modelo usa irradiancia medida, así que estima la producción esperada. Alimentado con previsión meteorológica sirve para prever producción, con un error mayor que depende de la calidad de esa previsión.</p>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div><b>Álvaro Martín Coll</b> · Físico · Ingeniero de IA para industria y energía<br>
+      <span class="note">Datos: dataset público de generación fotovoltaica (22 inversores, 34 días). Precio de la energía supuesto: 60 €/MWh. Proyecto demostrativo, sin datos de clientes.</span></div>
+    <div><a class="cta" href="https://www.malt.com/profile/alvaromartincoll">Hablemos de tu planta</a></div>
+  </footer>
+</main>
+<script>/* Minimal SVG chart kit shared by the portfolio dashboards.
+   Line (crosshair + tooltip), scatter, horizontal bar. No dependencies. */
+(function () {
+  const NS = "http://www.w3.org/2000/svg";
+  const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const el = (tag, attrs = {}, parent) => {
+    const e = document.createElementNS(NS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(e);
+    return e;
+  };
+  const nice = (min, max, n = 5) => {
+    const span = max - min || 1;
+    const step0 = span / n, mag = Math.pow(10, Math.floor(Math.log10(step0)));
+    const step = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((s) => span / s <= n) || 10 * mag;
+    const lo = Math.floor(min / step) * step, hi = Math.ceil(max / step) * step;
+    const ticks = [];
+    for (let v = lo; v <= hi + step / 2; v += step) ticks.push(+v.toFixed(10));
+    return { lo, hi, ticks };
+  };
+  const fmt = (v) => {
+    const a = Math.abs(v);
+    if (a >= 1e6) return (v / 1e6).toFixed(a >= 1e7 ? 0 : 1).replace(/\.0$/, "") + "M";
+    if (a >= 1e4) return (v / 1e3).toFixed(0) + "K";
+    if (Number.isInteger(v)) return v.toLocaleString("es-ES");
+    return v.toLocaleString("es-ES", { maximumFractionDigits: 2 });
+  };
+
+  let tip;
+  const tooltip = () => {
+    if (!tip) { tip = document.createElement("div"); tip.className = "viz-tip"; document.body.appendChild(tip); }
+    return tip;
+  };
+  const showTip = (html, ev) => {
+    const t = tooltip(); t.innerHTML = html; t.style.opacity = 1;
+    const r = t.getBoundingClientRect();
+    let x = ev.clientX + 14, y = ev.clientY + 14;
+    if (x + r.width > innerWidth - 8) x = ev.clientX - r.width - 14;
+    if (y + r.height > innerHeight - 8) y = ev.clientY - r.height - 14;
+    t.style.left = x + "px"; t.style.top = y + "px";
+  };
+  const hideTip = () => { if (tip) tip.style.opacity = 0; };
+
+  function frame(host, o) {
+    host.innerHTML = "";
+    const W = host.clientWidth || 600, H = o.height || 300;
+    const m = { t: 12, r: o.right || 16, b: o.xLabel ? 44 : 28, l: 52 };
+    const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, width: "100%", height: H, role: "img",
+                             "aria-label": o.aria || "" }, host);
+    return { svg, W, H, m, iw: W - m.l - m.r, ih: H - m.t - m.b };
+  }
+  function axes(f, xs, ys, o) {
+    const g = el("g", {}, f.svg);
+    ys.ticks.forEach((v) => {
+      const y = f.m.t + f.ih - ((v - ys.lo) / (ys.hi - ys.lo)) * f.ih;
+      el("line", { x1: f.m.l, x2: f.m.l + f.iw, y1: y, y2: y, stroke: css("--grid"), "stroke-width": 1 }, g);
+      const t = el("text", { x: f.m.l - 8, y: y + 4, "text-anchor": "end", class: "viz-tick" }, g);
+      t.textContent = (o.yFmt || fmt)(v);
+    });
+    xs.ticks.forEach((v) => {
+      const x = f.m.l + ((v - xs.lo) / (xs.hi - xs.lo)) * f.iw;
+      const t = el("text", { x, y: f.m.t + f.ih + 18, "text-anchor": "middle", class: "viz-tick" }, g);
+      t.textContent = (o.xFmt || fmt)(v);
+    });
+    el("line", { x1: f.m.l, x2: f.m.l + f.iw, y1: f.m.t + f.ih, y2: f.m.t + f.ih, stroke: css("--axis") }, g);
+    if (o.xLabel) {
+      const t = el("text", { x: f.m.l + f.iw / 2, y: f.H - 6, "text-anchor": "middle", class: "viz-label" }, g);
+      t.textContent = o.xLabel;
+    }
+    if (o.yLabel) {
+      const t = el("text", { x: 12, y: f.m.t + f.ih / 2, "text-anchor": "middle", class: "viz-label",
+                              transform: `rotate(-90 12 ${f.m.t + f.ih / 2})` }, g);
+      t.textContent = o.yLabel;
+    }
+  }
+
+  /* series: [{name, values, color, dash, fill}] ; x: array of numbers */
+  function line(host, o) {
+    const f = frame(host, o);
+    const all = o.series.flatMap((s) => s.values.filter((v) => v != null));
+    const xs = nice(Math.min(...o.x), Math.max(...o.x), o.xTicks || 6);
+    xs.lo = Math.min(...o.x); xs.hi = Math.max(...o.x);
+    xs.ticks = xs.ticks.filter((v) => v >= xs.lo && v <= xs.hi);
+    const ys = nice(o.yMin ?? Math.min(0, ...all), o.yMax ?? Math.max(...all), 5);
+    axes(f, xs, ys, o);
+    const X = (v) => f.m.l + ((v - xs.lo) / (xs.hi - xs.lo)) * f.iw;
+    const Y = (v) => f.m.t + f.ih - ((v - ys.lo) / (ys.hi - ys.lo)) * f.ih;
+    if (o.band) { // horizontal band e.g. alert zone
+      el("rect", { x: f.m.l, width: f.iw, y: Y(o.band.to), height: Y(o.band.from) - Y(o.band.to),
+                   fill: o.band.color, opacity: 0.12 }, f.svg);
+      const t = el("text", { x: f.m.l + f.iw - 6, y: Y(o.band.to) + 14, "text-anchor": "end", class: "viz-tick" }, f.svg);
+      t.textContent = o.band.label;
+    }
+    o.series.forEach((s) => {
+      let d = "", pen = false;
+      s.values.forEach((v, i) => {
+        if (v == null) { pen = false; return; }
+        d += (pen ? "L" : "M") + X(o.x[i]).toFixed(1) + "," + Y(v).toFixed(1); pen = true;
+      });
+      if (s.fill) {
+        const first = s.values.findIndex((v) => v != null);
+        const last = s.values.length - 1 - [...s.values].reverse().findIndex((v) => v != null);
+        el("path", { d: d + `L${X(o.x[last])},${Y(ys.lo)}L${X(o.x[first])},${Y(ys.lo)}Z`,
+                     fill: s.color, opacity: 0.1 }, f.svg);
+      }
+      el("path", { d, fill: "none", stroke: s.color, "stroke-width": s.width || 2,
+                   "stroke-linejoin": "round", "stroke-linecap": "round",
+                   "stroke-dasharray": s.dash || "" }, f.svg);
+    });
+    // crosshair
+    const hair = el("line", { y1: f.m.t, y2: f.m.t + f.ih, stroke: css("--axis"), opacity: 0 }, f.svg);
+    const dots = o.series.map((s) => el("circle", { r: 4, fill: s.color, stroke: css("--surface"),
+                                                     "stroke-width": 2, opacity: 0 }, f.svg));
+    const hit = el("rect", { x: f.m.l, y: f.m.t, width: f.iw, height: f.ih, fill: "transparent" }, f.svg);
+    hit.addEventListener("mousemove", (ev) => {
+      const r = f.svg.getBoundingClientRect();
+      const px = ((ev.clientX - r.left) / r.width) * f.W;
+      const xv = xs.lo + ((px - f.m.l) / f.iw) * (xs.hi - xs.lo);
+      let i = 0, best = Infinity;
+      o.x.forEach((v, k) => { const d = Math.abs(v - xv); if (d < best) { best = d; i = k; } });
+      hair.setAttribute("x1", X(o.x[i])); hair.setAttribute("x2", X(o.x[i])); hair.setAttribute("opacity", 1);
+      let html = `<b>${(o.xTip || ((v) => (o.xLabel || "x") + " " + fmt(v)))(o.x[i])}</b>`;
+      o.series.forEach((s, k) => {
+        const v = s.values[i];
+        if (v == null) { dots[k].setAttribute("opacity", 0); return; }
+        dots[k].setAttribute("cx", X(o.x[i])); dots[k].setAttribute("cy", Y(v)); dots[k].setAttribute("opacity", 1);
+        html += `<div><i style="background:${s.color}"></i>${s.name}: <b>${(o.yTip || fmt)(v)}</b></div>`;
+      });
+      showTip(html, ev);
+    });
+    hit.addEventListener("mouseleave", () => { hair.setAttribute("opacity", 0); dots.forEach((d) => d.setAttribute("opacity", 0)); hideTip(); });
+  }
+
+  /* points: [{x, y, label}] */
+  function scatter(host, o) {
+    const f = frame(host, o);
+    const vx = o.points.map((p) => p.x), vy = o.points.map((p) => p.y);
+    const lo = Math.min(0, ...vx, ...vy), hi = Math.max(...vx, ...vy);
+    const xs = nice(lo, hi, 5), ys = nice(lo, hi, 5);
+    axes(f, xs, ys, o);
+    const X = (v) => f.m.l + ((v - xs.lo) / (xs.hi - xs.lo)) * f.iw;
+    const Y = (v) => f.m.t + f.ih - ((v - ys.lo) / (ys.hi - ys.lo)) * f.ih;
+    if (o.diag) el("line", { x1: X(xs.lo), y1: Y(ys.lo), x2: X(Math.min(xs.hi, ys.hi)), y2: Y(Math.min(xs.hi, ys.hi)),
+                             stroke: css("--text-3"), "stroke-width": 1 }, f.svg);
+    o.points.forEach((p) => {
+      const c = el("circle", { cx: X(p.x), cy: Y(p.y), r: 4.5, fill: p.color || o.color,
+                               stroke: css("--surface"), "stroke-width": 2 }, f.svg);
+      const h = el("circle", { cx: X(p.x), cy: Y(p.y), r: 10, fill: "transparent" }, f.svg);
+      h.addEventListener("mousemove", (ev) => { c.setAttribute("r", 6); showTip(p.tip || `${fmt(p.x)} → ${fmt(p.y)}`, ev); });
+      h.addEventListener("mouseleave", () => { c.setAttribute("r", 4.5); hideTip(); });
+    });
+  }
+
+  /* items: [{label, value}] horizontal bars, value labels at tip */
+  function bars(host, o) {
+    host.innerHTML = "";
+    const max = Math.max(...o.items.map((d) => d.value));
+    o.items.forEach((d) => {
+      const row = document.createElement("div"); row.className = "viz-bar";
+      row.innerHTML = `<span class="viz-bar-l">${d.label}</span>
+        <span class="viz-bar-t"><span class="viz-bar-f" style="width:${(100 * d.value) / max}%;background:${d.color || o.color}"></span></span>
+        <span class="viz-bar-v">${(o.fmt || fmt)(d.value)}</span>`;
+      row.addEventListener("mousemove", (ev) => showTip(`<b>${d.label}</b><div>${(o.fmt || fmt)(d.value)}</div>`, ev));
+      row.addEventListener("mouseleave", hideTip);
+      host.appendChild(row);
+    });
+  }
+
+  /* Animate numbers counting up (data-count attr) */
+  function countUp(root = document) {
+    root.querySelectorAll("[data-count]").forEach((e) => {
+      const target = parseFloat(e.dataset.count), dec = +(e.dataset.dec || 0);
+      const pre = e.dataset.pre || "", suf = e.dataset.suf || "";
+      const t0 = performance.now(), dur = 1200;
+      const step = (t) => {
+        const k = Math.min(1, (t - t0) / dur), v = target * (1 - Math.pow(1 - k, 3));
+        e.textContent = pre + v.toLocaleString("es-ES", { minimumFractionDigits: dec, maximumFractionDigits: dec }) + suf;
+        if (k < 1) requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+    });
+  }
+
+  window.Viz = { line, scatter, bars, countUp, fmt };
+})();
+</script>
+<script>
+const R = {"dataset": "Planta FV p\u00fablica, 22 inversores, 34 d\u00edas, resoluci\u00f3n 15 min", "capacity_mw": 28.5, "k_gain": 31.7671, "train_days": 24, "test_days": 10, "models": {"F\u00edsico": {"nrmse_pct": 2.68, "nmae_pct": 1.89, "energy_error_pct": -1.15}, "Machine learning": {"nrmse_pct": 2.35, "nmae_pct": 1.61, "energy_error_pct": -0.5}, "H\u00edbrido": {"nrmse_pct": 2.34, "nmae_pct": 1.53, "energy_error_pct": -0.37}}, "models_5_days": {"F\u00edsico": {"nrmse_pct": 2.67, "nmae_pct": 1.77, "energy_error_pct": 0.73}, "Machine learning": {"nrmse_pct": 3.2, "nmae_pct": 2.16, "energy_error_pct": -1.07}, "H\u00edbrido": {"nrmse_pct": 2.61, "nmae_pct": 1.67, "energy_error_pct": 0.29}}, "test_series": {"ts": ["2020-06-08 00:00", "2020-06-08 00:15", "2020-06-08 00:30", "2020-06-08 00:45", "2020-06-08 01:00", "2020-06-08 01:15", "2020-06-08 01:30", "2020-06-08 01:45", "2020-06-08 02:00", "2020-06-08 02:15", "2020-06-08 02:30", "2020-06-08 02:45", "2020-06-08 03:00", "2020-06-08 03:15", "2020-06-08 03:30", "2020-06-08 03:45", "2020-06-08 04:00", "2020-06-08 04:15", "2020-06-08 04:30", "2020-06-08 04:45", "2020-06-08 05:00", "2020-06-08 05:15", "2020-06-08 05:30", "2020-06-08 05:45", "2020-06-08 06:00", "2020-06-08 06:15", "2020-06-08 06:30", "2020-06-08 06:45", "2020-06-08 07:00", "2020-06-08 07:15", "2020-06-08 07:30", "2020-06-08 07:45", "2020-06-08 08:00", "2020-06-08 08:15", "2020-06-08 08:30", "2020-06-08 08:45", "2020-06-08 09:00", "2020-06-08 09:15", "2020-06-08 09:30", "2020-06-08 09:45", "2020-06-08 10:00", "2020-06-08 10:15", "2020-06-08 10:30", "2020-06-08 10:45", "2020-06-08 11:00", "2020-06-08 11:15", "2020-06-08 11:30", "2020-06-08 11:45", "2020-06-08 12:00", "2020-06-08 12:15", "2020-06-08 12:30", "2020-06-08 12:45", "2020-06-08 13:00", "2020-06-08 13:15", "2020-06-08 13:30", "2020-06-08 13:45", "2020-06-08 14:00", "2020-06-08 14:15", "2020-06-08 14:30", "2020-06-08 14:45", "2020-06-08 15:00", "2020-06-08 15:15", "2020-06-08 15:30", "2020-06-08 15:45", "2020-06-08 16:00", "2020-06-08 16:15", "2020-06-08 16:30", "2020-06-08 16:45", "2020-06-08 17:00", "2020-06-08 17:15", "2020-06-08 17:30", "2020-06-08 17:45", "2020-06-08 18:00", "2020-06-08 18:15", "2020-06-08 18:30", "2020-06-08 18:45", "2020-06-08 19:00", "2020-06-08 19:15", "2020-06-08 19:30", "2020-06-08 19:45", "2020-06-08 20:00", "2020-06-08 20:15", "2020-06-08 20:30", "2020-06-08 20:45", "2020-06-08 21:00", "2020-06-08 21:15", "2020-06-08 21:30", "2020-06-08 21:45", "2020-06-08 22:00", "2020-06-08 22:15", "2020-06-08 22:30", "2020-06-08 22:45", "2020-06-08 23:00", "2020-06-08 23:15", "2020-06-08 23:30", "2020-06-08 23:45", "2020-06-09 00:00", "2020-06-09 00:15", "2020-06-09 00:30", "2020-06-09 00:45", "2020-06-09 01:00", "2020-06-09 01:15", "2020-06-09 01:30", "2020-06-09 01:45", "2020-06-09 02:00", "2020-06-09 02:15", "2020-06-09 02:30", "2020-06-09 02:45", "2020-06-09 03:00", "2020-06-09 03:15", "2020-06-09 03:30", "2020-06-09 03:45", "2020-06-09 04:00", "2020-06-09 04:15", "2020-06-09 04:30", "2020-06-09 04:45", "2020-06-09 05:00", "2020-06-09 05:15", "2020-06-09 05:30", "2020-06-09 05:45", "2020-06-09 06:00", "2020-06-09 06:15", "2020-06-09 06:30", "2020-06-09 06:45", "2020-06-09 07:00", "2020-06-09 07:15", "2020-06-09 07:30", "2020-06-09 07:45", "2020-06-09 08:00", "2020-06-09 08:15", "2020-06-09 08:30", "2020-06-09 08:45", "2020-06-09 09:00", "2020-06-09 09:15", "2020-06-09 09:30", "2020-06-09 09:45", "2020-06-09 10:00", "2020-06-09 10:15", "2020-06-09 10:30", "2020-06-09 10:45", "2020-06-09 11:00", "2020-06-09 11:15", "2020-06-09 11:30", "2020-06-09 11:45", "2020-06-09 12:00", "2020-06-09 12:15", "2020-06-09 12:30", "2020-06-09 12:45", "2020-06-09 13:00", "2020-06-09 13:15", "2020-06-09 13:30", "2020-06-09 13:45", "2020-06-09 14:00", "2020-06-09 14:15", "2020-06-09 14:30", "2020-06-09 14:45", "2020-06-09 15:00", "2020-06-09 15:15", "2020-06-09 15:30", "2020-06-09 15:45", "2020-06-09 16:00", "2020-06-09 16:15", "2020-06-09 16:30", "2020-06-09 16:45", "2020-06-09 17:00", "2020-06-09 17:15", "2020-06-09 17:30", "2020-06-09 17:45", "2020-06-09 18:00", "2020-06-09 18:15", "2020-06-09 18:30", "2020-06-09 18:45", "2020-06-09 19:00", "2020-06-09 19:15", "2020-06-09 19:30", "2020-06-09 19:45", "2020-06-09 20:00", "2020-06-09 20:15", "2020-06-09 20:30", "2020-06-09 20:45", "2020-06-09 21:00", "2020-06-09 21:15", "2020-06-09 21:30", "2020-06-09 21:45", "2020-06-09 22:00", "2020-06-09 22:15", "2020-06-09 22:30", "2020-06-09 22:45", "2020-06-09 23:00", "2020-06-09 23:15", "2020-06-09 23:30", "2020-06-09 23:45", "2020-06-10 00:00", "2020-06-10 00:15", "2020-06-10 00:30", "2020-06-10 00:45", "2020-06-10 01:00", "2020-06-10 01:15", "2020-06-10 01:30", "2020-06-10 01:45", "2020-06-10 02:00", "2020-06-10 02:15", "2020-06-10 02:30", "2020-06-10 02:45", "2020-06-10 03:00", "2020-06-10 03:15", "2020-06-10 03:30", "2020-06-10 03:45", "2020-06-10 04:00", "2020-06-10 04:15", "2020-06-10 04:30", "2020-06-10 04:45", "2020-06-10 05:00", "2020-06-10 05:15", "2020-06-10 05:30", "2020-06-10 05:45", "2020-06-10 06:00", "2020-06-10 06:15", "2020-06-10 06:30", "2020-06-10 06:45", "2020-06-10 07:00", "2020-06-10 07:15", "2020-06-10 07:30", "2020-06-10 07:45", "2020-06-10 08:00", "2020-06-10 08:15", "2020-06-10 08:30", "2020-06-10 08:45", "2020-06-10 09:00", "2020-06-10 09:15", "2020-06-10 09:30", "2020-06-10 09:45", "2020-06-10 10:00", "2020-06-10 10:15", "2020-06-10 10:30", "2020-06-10 10:45", "2020-06-10 11:00", "2020-06-10 11:15", "2020-06-10 11:30", "2020-06-10 11:45", "2020-06-10 12:00", "2020-06-10 12:15", "2020-06-10 12:30", "2020-06-10 12:45", "2020-06-10 13:00", "2020-06-10 13:15", "2020-06-10 13:30", "2020-06-10 13:45", "2020-06-10 14:00", "2020-06-10 14:15", "2020-06-10 14:30", "2020-06-10 14:45", "2020-06-10 15:00", "2020-06-10 15:15", "2020-06-10 15:30", "2020-06-10 15:45", "2020-06-10 16:00", "2020-06-10 16:15", "2020-06-10 16:30", "2020-06-10 16:45", "2020-06-10 17:00", "2020-06-10 17:15", "2020-06-10 17:30", "2020-06-10 17:45", "2020-06-10 18:00", "2020-06-10 18:15", "2020-06-10 18:30", "2020-06-10 18:45", "2020-06-10 19:00", "2020-06-10 19:15", "2020-06-10 19:30", "2020-06-10 19:45", "2020-06-10 20:00", "2020-06-10 20:15", "2020-06-10 20:30", "2020-06-10 20:45", "2020-06-10 21:00", "2020-06-10 21:15", "2020-06-10 21:30", "2020-06-10 21:45", "2020-06-10 22:00", "2020-06-10 22:15", "2020-06-10 22:30", "2020-06-10 22:45", "2020-06-10 23:00", "2020-06-10 23:15", "2020-06-10 23:30", "2020-06-10 23:45", "2020-06-11 00:00", "2020-06-11 00:15", "2020-06-11 00:30", "2020-06-11 00:45", "2020-06-11 01:00", "2020-06-11 01:15", "2020-06-11 01:30", "2020-06-11 01:45", "2020-06-11 02:00", "2020-06-11 02:15", "2020-06-11 02:30", "2020-06-11 02:45", "2020-06-11 03:00", "2020-06-11 03:15", "2020-06-11 03:30", "2020-06-11 03:45", "2020-06-11 04:00", "2020-06-11 04:15", "2020-06-11 04:30", "2020-06-11 04:45", "2020-06-11 05:00", "2020-06-11 05:15", "2020-06-11 05:30", "2020-06-11 05:45", "2020-06-11 06:00", "2020-06-11 06:15", "2020-06-11 06:30", "2020-06-11 06:45", "2020-06-11 07:00", "2020-06-11 07:15", "2020-06-11 07:30", "2020-06-11 07:45", "2020-06-11 08:00", "2020-06-11 08:15", "2020-06-11 08:30", "2020-06-11 08:45", "2020-06-11 09:00", "2020-06-11 09:15", "2020-06-11 09:30", "2020-06-11 09:45", "2020-06-11 10:00", "2020-06-11 10:15", "2020-06-11 10:30", "2020-06-11 10:45", "2020-06-11 11:00", "2020-06-11 11:15", "2020-06-11 11:30", "2020-06-11 11:45", "2020-06-11 12:00", "2020-06-11 12:15", "2020-06-11 12:30", "2020-06-11 12:45", "2020-06-11 13:00", "2020-06-11 13:15", "2020-06-11 13:30", "2020-06-11 13:45", "2020-06-11 14:00", "2020-06-11 14:15", "2020-06-11 14:30", "2020-06-11 14:45", "2020-06-11 15:00", "2020-06-11 15:15", "2020-06-11 15:30", "2020-06-11 15:45", "2020-06-11 16:00", "2020-06-11 16:15", "2020-06-11 16:30", "2020-06-11 16:45", "2020-06-11 17:00", "2020-06-11 17:15", "2020-06-11 17:30", "2020-06-11 17:45", "2020-06-11 18:00", "2020-06-11 18:15", "2020-06-11 18:30", "2020-06-11 18:45", "2020-06-11 19:00", "2020-06-11 19:15", "2020-06-11 19:30", "2020-06-11 19:45", "2020-06-11 20:00", "2020-06-11 20:15", "2020-06-11 20:30", "2020-06-11 20:45", "2020-06-11 21:00", "2020-06-11 21:15", "2020-06-11 21:30", "2020-06-11 21:45", "2020-06-11 22:00", "2020-06-11 22:15", "2020-06-11 22:30", "2020-06-11 22:45", "2020-06-11 23:00", "2020-06-11 23:15", "2020-06-11 23:30", "2020-06-11 23:45", "2020-06-12 00:00", "2020-06-12 00:15", "2020-06-12 00:30", "2020-06-12 00:45", "2020-06-12 01:00", "2020-06-12 01:15", "2020-06-12 01:30", "2020-06-12 01:45", "2020-06-12 02:00", "2020-06-12 02:15", "2020-06-12 02:30", "2020-06-12 02:45", "2020-06-12 03:00", "2020-06-12 03:15", "2020-06-12 03:30", "2020-06-12 03:45", "2020-06-12 04:00", "2020-06-12 04:15", "2020-06-12 04:30", "2020-06-12 04:45", "2020-06-12 05:00", "2020-06-12 05:15", "2020-06-12 05:30", "2020-06-12 05:45", "2020-06-12 06:00", "2020-06-12 06:15", "2020-06-12 06:30", "2020-06-12 06:45", "2020-06-12 07:00", "2020-06-12 07:15", "2020-06-12 07:30", "2020-06-12 07:45", "2020-06-12 08:00", "2020-06-12 08:15", "2020-06-12 08:30", "2020-06-12 08:45", "2020-06-12 09:00", "2020-06-12 09:15", "2020-06-12 09:30", "2020-06-12 09:45", "2020-06-12 10:00", "2020-06-12 10:15", "2020-06-12 10:30", "2020-06-12 10:45", "2020-06-12 11:00", "2020-06-12 11:15", "2020-06-12 11:30", "2020-06-12 11:45", "2020-06-12 12:00", "2020-06-12 12:15", "2020-06-12 12:30", "2020-06-12 12:45", "2020-06-12 13:00", "2020-06-12 13:15", "2020-06-12 13:30", "2020-06-12 13:45", "2020-06-12 14:00", "2020-06-12 14:15", "2020-06-12 14:30", "2020-06-12 14:45", "2020-06-12 15:00", "2020-06-12 15:15", "2020-06-12 15:30", "2020-06-12 15:45", "2020-06-12 16:00", "2020-06-12 16:15", "2020-06-12 16:30", "2020-06-12 16:45", "2020-06-12 17:00", "2020-06-12 17:15", "2020-06-12 17:30", "2020-06-12 17:45", "2020-06-12 18:00", "2020-06-12 18:15", "2020-06-12 18:30", "2020-06-12 18:45", "2020-06-12 19:00", "2020-06-12 19:15", "2020-06-12 19:30", "2020-06-12 19:45", "2020-06-12 20:00", "2020-06-12 20:15", "2020-06-12 20:30", "2020-06-12 20:45", "2020-06-12 21:00", "2020-06-12 21:15", "2020-06-12 21:30", "2020-06-12 21:45", "2020-06-12 22:00", "2020-06-12 22:15", "2020-06-12 22:30", "2020-06-12 22:45", "2020-06-12 23:00", "2020-06-12 23:15", "2020-06-12 23:30", "2020-06-12 23:45", "2020-06-13 00:00", "2020-06-13 00:15", "2020-06-13 00:30", "2020-06-13 00:45", "2020-06-13 01:00", "2020-06-13 01:15", "2020-06-13 01:30", "2020-06-13 01:45", "2020-06-13 02:00", "2020-06-13 02:15", "2020-06-13 02:30", "2020-06-13 02:45", "2020-06-13 03:00", "2020-06-13 03:15", "2020-06-13 03:30", "2020-06-13 03:45", "2020-06-13 04:00", "2020-06-13 04:15", "2020-06-13 04:30", "2020-06-13 04:45", "2020-06-13 05:00", "2020-06-13 05:15", "2020-06-13 05:30", "2020-06-13 05:45", "2020-06-13 06:00", "2020-06-13 06:15", "2020-06-13 06:30", "2020-06-13 06:45", "2020-06-13 07:00", "2020-06-13 07:15", "2020-06-13 07:30", "2020-06-13 07:45", "2020-06-13 08:00", "2020-06-13 08:15", "2020-06-13 08:30", "2020-06-13 08:45", "2020-06-13 09:00", "2020-06-13 09:15", "2020-06-13 09:30", "2020-06-13 09:45", "2020-06-13 10:00", "2020-06-13 10:15", "2020-06-13 10:30", "2020-06-13 10:45", "2020-06-13 11:00", "2020-06-13 11:15", "2020-06-13 11:30", "2020-06-13 11:45", "2020-06-13 12:00", "2020-06-13 12:15", "2020-06-13 12:30", "2020-06-13 12:45", "2020-06-13 13:00", "2020-06-13 13:15", "2020-06-13 13:30", "2020-06-13 13:45", "2020-06-13 14:00", "2020-06-13 14:15", "2020-06-13 14:30", "2020-06-13 14:45", "2020-06-13 15:00", "2020-06-13 15:15", "2020-06-13 15:30", "2020-06-13 15:45", "2020-06-13 16:00", "2020-06-13 16:15", "2020-06-13 16:30", "2020-06-13 16:45", "2020-06-13 17:00", "2020-06-13 17:15", "2020-06-13 17:30", "2020-06-13 17:45", "2020-06-13 18:00", "2020-06-13 18:15", "2020-06-13 18:30", "2020-06-13 18:45", "2020-06-13 19:00", "2020-06-13 19:15", "2020-06-13 19:30", "2020-06-13 19:45", "2020-06-13 20:00", "2020-06-13 20:15", "2020-06-13 20:30", "2020-06-13 20:45", "2020-06-13 21:00", "2020-06-13 21:15", "2020-06-13 21:30", "2020-06-13 21:45", "2020-06-13 22:00", "2020-06-13 22:15", "2020-06-13 22:30", "2020-06-13 22:45", "2020-06-13 23:00", "2020-06-13 23:15", "2020-06-13 23:30", "2020-06-13 23:45", "2020-06-14 00:00", "2020-06-14 00:15", "2020-06-14 00:30", "2020-06-14 00:45", "2020-06-14 01:00", "2020-06-14 01:15", "2020-06-14 01:30", "2020-06-14 01:45", "2020-06-14 02:00", "2020-06-14 02:15", "2020-06-14 02:30", "2020-06-14 02:45", "2020-06-14 03:00", "2020-06-14 03:15", "2020-06-14 03:30", "2020-06-14 03:45", "2020-06-14 04:00", "2020-06-14 04:15", "2020-06-14 04:30", "2020-06-14 04:45", "2020-06-14 05:00", "2020-06-14 05:15", "2020-06-14 05:30", "2020-06-14 05:45", "2020-06-14 06:00", "2020-06-14 06:15", "2020-06-14 06:30", "2020-06-14 06:45", "2020-06-14 07:00", "2020-06-14 07:15", "2020-06-14 07:30", "2020-06-14 07:45", "2020-06-14 08:00", "2020-06-14 08:15", "2020-06-14 08:30", "2020-06-14 08:45", "2020-06-14 09:00", "2020-06-14 09:15", "2020-06-14 09:30", "2020-06-14 09:45", "2020-06-14 10:00", "2020-06-14 10:15", "2020-06-14 10:30", "2020-06-14 10:45", "2020-06-14 11:00", "2020-06-14 11:15", "2020-06-14 11:30", "2020-06-14 11:45", "2020-06-14 12:00", "2020-06-14 12:15", "2020-06-14 12:30", "2020-06-14 12:45", "2020-06-14 13:00", "2020-06-14 13:15", "2020-06-14 13:30", "2020-06-14 13:45", "2020-06-14 14:00", "2020-06-14 14:15", "2020-06-14 14:30", "2020-06-14 14:45", "2020-06-14 15:00", "2020-06-14 15:15", "2020-06-14 15:30", "2020-06-14 15:45", "2020-06-14 16:00", "2020-06-14 16:15", "2020-06-14 16:30", "2020-06-14 16:45", "2020-06-14 17:00", "2020-06-14 17:15", "2020-06-14 17:30", "2020-06-14 17:45", "2020-06-14 18:00", "2020-06-14 18:15", "2020-06-14 18:30", "2020-06-14 18:45", "2020-06-14 19:00", "2020-06-14 19:15", "2020-06-14 19:30", "2020-06-14 19:45", "2020-06-14 20:00", "2020-06-14 20:15", "2020-06-14 20:30", "2020-06-14 20:45", "2020-06-14 21:00", "2020-06-14 21:15", "2020-06-14 21:30", "2020-06-14 21:45", "2020-06-14 22:00", "2020-06-14 22:15", "2020-06-14 22:30", "2020-06-14 22:45", "2020-06-14 23:00", "2020-06-14 23:15", "2020-06-14 23:30", "2020-06-14 23:45", "2020-06-15 00:00", "2020-06-15 00:15", "2020-06-15 00:30", "2020-06-15 00:45", "2020-06-15 01:00", "2020-06-15 01:15", "2020-06-15 01:30", "2020-06-15 01:45", "2020-06-15 02:00", "2020-06-15 02:15", "2020-06-15 02:30", "2020-06-15 02:45", "2020-06-15 03:00", "2020-06-15 03:15", "2020-06-15 03:30", "2020-06-15 03:45", "2020-06-15 04:00", "2020-06-15 04:15", "2020-06-15 04:30", "2020-06-15 04:45", "2020-06-15 05:00", "2020-06-15 05:15", "2020-06-15 05:30", "2020-06-15 05:45", "2020-06-15 06:00", "2020-06-15 06:15", "2020-06-15 06:30", "2020-06-15 06:45", "2020-06-15 07:00", "2020-06-15 07:15", "2020-06-15 07:30", "2020-06-15 07:45", "2020-06-15 08:00", "2020-06-15 08:15", "2020-06-15 08:30", "2020-06-15 08:45", "2020-06-15 09:00", "2020-06-15 09:15", "2020-06-15 09:30", "2020-06-15 09:45", "2020-06-15 10:00", "2020-06-15 10:15", "2020-06-15 10:30", "2020-06-15 10:45", "2020-06-15 11:00", "2020-06-15 11:15", "2020-06-15 11:30", "2020-06-15 11:45", "2020-06-15 12:00", "2020-06-15 12:15", "2020-06-15 12:30", "2020-06-15 12:45", "2020-06-15 13:00", "2020-06-15 13:15", "2020-06-15 13:30", "2020-06-15 13:45", "2020-06-15 14:00", "2020-06-15 14:15", "2020-06-15 14:30", "2020-06-15 14:45", "2020-06-15 15:00", "2020-06-15 15:15", "2020-06-15 15:30", "2020-06-15 15:45", "2020-06-15 16:00", "2020-06-15 16:15", "2020-06-15 16:30", "2020-06-15 16:45", "2020-06-15 17:00", "2020-06-15 17:15", "2020-06-15 17:30", "2020-06-15 17:45", "2020-06-15 18:00", "2020-06-15 18:15", "2020-06-15 18:30", "2020-06-15 18:45", "2020-06-15 19:00", "2020-06-15 19:15", "2020-06-15 19:30", "2020-06-15 19:45", "2020-06-15 20:00", "2020-06-15 20:15", "2020-06-15 20:30", "2020-06-15 20:45", "2020-06-15 21:00", "2020-06-15 21:15", "2020-06-15 21:30", "2020-06-15 21:45", "2020-06-15 22:00", "2020-06-15 22:15", "2020-06-15 22:30", "2020-06-15 22:45", "2020-06-15 23:00", "2020-06-15 23:15", "2020-06-15 23:30", "2020-06-15 23:45", "2020-06-16 00:00", "2020-06-16 00:15", "2020-06-16 00:30", "2020-06-16 00:45", "2020-06-16 01:00", "2020-06-16 01:15", "2020-06-16 01:30", "2020-06-16 01:45", "2020-06-16 02:00", "2020-06-16 02:15", "2020-06-16 02:30", "2020-06-16 02:45", "2020-06-16 03:00", "2020-06-16 03:15", "2020-06-16 03:30", "2020-06-16 03:45", "2020-06-16 04:00", "2020-06-16 04:15", "2020-06-16 04:30", "2020-06-16 04:45", "2020-06-16 05:00", "2020-06-16 05:15", "2020-06-16 05:30", "2020-06-16 05:45", "2020-06-16 06:00", "2020-06-16 06:15", "2020-06-16 06:30", "2020-06-16 06:45", "2020-06-16 07:00", "2020-06-16 07:15", "2020-06-16 07:30", "2020-06-16 07:45", "2020-06-16 08:00", "2020-06-16 08:15", "2020-06-16 08:30", "2020-06-16 08:45", "2020-06-16 09:00", "2020-06-16 09:15", "2020-06-16 09:30", "2020-06-16 09:45", "2020-06-16 10:00", "2020-06-16 10:15", "2020-06-16 10:30", "2020-06-16 10:45", "2020-06-16 11:00", "2020-06-16 11:15", "2020-06-16 11:30", "2020-06-16 11:45", "2020-06-16 12:00", "2020-06-16 12:15", "2020-06-16 12:30", "2020-06-16 12:45", "2020-06-16 13:00", "2020-06-16 13:15", "2020-06-16 13:30", "2020-06-16 13:45", "2020-06-16 14:00", "2020-06-16 14:15", "2020-06-16 14:30", "2020-06-16 14:45", "2020-06-16 15:00", "2020-06-16 15:15", "2020-06-16 15:30", "2020-06-16 15:45", "2020-06-16 16:00", "2020-06-16 16:15", "2020-06-16 16:30", "2020-06-16 16:45", "2020-06-16 17:00", "2020-06-16 17:15", "2020-06-16 17:30", "2020-06-16 17:45", "2020-06-16 18:00", "2020-06-16 18:15", "2020-06-16 18:30", "2020-06-16 18:45", "2020-06-16 19:00", "2020-06-16 19:15", "2020-06-16 19:30", "2020-06-16 19:45", "2020-06-16 20:00", "2020-06-16 20:15", "2020-06-16 20:30", "2020-06-16 20:45", "2020-06-16 21:00", "2020-06-16 21:15", "2020-06-16 21:30", "2020-06-16 21:45", "2020-06-16 22:00", "2020-06-16 22:15", "2020-06-16 22:30", "2020-06-16 22:45", "2020-06-16 23:00", "2020-06-16 23:15", "2020-06-16 23:30", "2020-06-16 23:45", "2020-06-17 00:00", "2020-06-17 00:15", "2020-06-17 00:30", "2020-06-17 00:45", "2020-06-17 01:00", "2020-06-17 01:15", "2020-06-17 01:30", "2020-06-17 01:45", "2020-06-17 02:00", "2020-06-17 02:15", "2020-06-17 02:30", "2020-06-17 02:45", "2020-06-17 03:00", "2020-06-17 03:15", "2020-06-17 03:30", "2020-06-17 03:45", "2020-06-17 04:00", "2020-06-17 04:15", "2020-06-17 04:30", "2020-06-17 04:45", "2020-06-17 05:00", "2020-06-17 05:15", "2020-06-17 05:30", "2020-06-17 05:45", "2020-06-17 06:00", "2020-06-17 06:45", "2020-06-17 07:00", "2020-06-17 07:15", "2020-06-17 07:30", "2020-06-17 07:45", "2020-06-17 08:00", "2020-06-17 08:15", "2020-06-17 08:30", "2020-06-17 08:45", "2020-06-17 09:00", "2020-06-17 09:15", "2020-06-17 09:30", "2020-06-17 09:45", "2020-06-17 10:00", "2020-06-17 10:15", "2020-06-17 10:30", "2020-06-17 10:45", "2020-06-17 11:00", "2020-06-17 11:15", "2020-06-17 11:30", "2020-06-17 11:45", "2020-06-17 12:00", "2020-06-17 12:15", "2020-06-17 12:30", "2020-06-17 12:45", "2020-06-17 13:00", "2020-06-17 13:15", "2020-06-17 13:30", "2020-06-17 13:45", "2020-06-17 14:00", "2020-06-17 14:15", "2020-06-17 14:30", "2020-06-17 14:45", "2020-06-17 15:00", "2020-06-17 15:15", "2020-06-17 15:30", "2020-06-17 15:45", "2020-06-17 16:00", "2020-06-17 16:15", "2020-06-17 16:30", "2020-06-17 16:45", "2020-06-17 17:00", "2020-06-17 17:15", "2020-06-17 17:30", "2020-06-17 17:45", "2020-06-17 18:00", "2020-06-17 18:15", "2020-06-17 18:30", "2020-06-17 18:45", "2020-06-17 19:00", "2020-06-17 19:15", "2020-06-17 19:30", "2020-06-17 19:45", "2020-06-17 20:00", "2020-06-17 20:15", "2020-06-17 20:30", "2020-06-17 20:45", "2020-06-17 21:00", "2020-06-17 21:15", "2020-06-17 21:30", "2020-06-17 21:45", "2020-06-17 22:00", "2020-06-17 22:15", "2020-06-17 22:30", "2020-06-17 22:45", "2020-06-17 23:00", "2020-06-17 23:15", "2020-06-17 23:30", "2020-06-17 23:45"], "real": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.216, 0.958, 1.801, 2.365, 3.327, 4.162, 5.299, 8.432, 8.927, 7.18, 11.76, 15.59, 14.607, 20.066, 24.044, 24.488, 26.084, 23.182, 24.659, 24.601, 25.516, 24.042, 22.018, 22.241, 21.969, 18.962, 25.23, 16.557, 20.824, 19.092, 17.375, 21.442, 21.36, 22.54, 23.798, 20.703, 21.341, 20.029, 14.846, 15.38, 10.329, 7.272, 11.788, 11.718, 7.11, 5.008, 4.188, 2.723, 1.728, 0.953, 0.255, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.341, 1.034, 1.803, 3.072, 4.811, 5.775, 5.929, 5.426, 11.334, 13.425, 14.881, 16.42, 18.551, 17.47, 18.99, 20.716, 12.221, 21.184, 26.532, 25.474, 24.809, 25.04, 18.531, 25.781, 19.788, 17.444, 22.549, 21.383, 22.625, 22.611, 20.174, 19.421, 13.13, 14.036, 18.709, 16.781, 17.765, 17.625, 18.157, 16.174, 13.808, 12.013, 11.089, 9.087, 6.962, 5.837, 4.529, 3.067, 1.819, 0.903, 0.197, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.205, 0.915, 1.854, 2.861, 4.347, 5.527, 7.239, 8.971, 9.265, 6.369, 7.716, 14.14, 14.845, 16.562, 17.536, 12.743, 10.32, 14.947, 14.727, 12.672, 10.414, 16.495, 19.047, 19.649, 28.425, 22.342, 26.125, 24.766, 20.66, 16.862, 24.68, 20.264, 15.523, 20.032, 12.737, 2.086, 4.564, 7.473, 10.084, 8.242, 8.999, 11.451, 7.552, 5.993, 5.249, 5.293, 3.196, 2.533, 1.193, 0.247, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.318, 0.773, 1.128, 1.677, 2.571, 3.156, 4.352, 5.577, 6.235, 6.518, 7.359, 8.19, 9.039, 9.611, 10.288, 11.092, 12.068, 12.321, 12.771, 15.505, 16.785, 15.787, 17.764, 19.973, 19.207, 17.05, 12.529, 14.582, 15.706, 10.412, 13.813, 14.541, 20.226, 22.24, 13.309, 15.944, 13.594, 15.428, 13.659, 10.372, 9.614, 7.793, 6.811, 5.158, 4.068, 3.051, 2.105, 1.346, 0.633, 0.124, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.339, 0.776, 1.482, 1.992, 2.271, 1.997, 2.79, 3.858, 6.029, 6.826, 8.835, 10.736, 12.828, 11.463, 13.984, 12.472, 16.597, 17.621, 14.404, 13.093, 17.894, 21.376, 20.065, 21.86, 15.746, 15.26, 16.908, 17.321, 16.86, 17.931, 20.543, 18.838, 15.865, 13.767, 12.847, 12.36, 10.563, 12.538, 9.899, 6.227, 5.872, 5.911, 5.638, 4.151, 3.881, 4.69, 3.356, 1.767, 0.791, 0.172, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.199, 0.768, 1.269, 2.312, 3.862, 5.687, 7.276, 9.254, 11.227, 13.497, 14.846, 15.99, 17.055, 18.05, 17.396, 18.726, 19.24, 22.165, 24.858, 23.408, 23.668, 27.388, 26.818, 27.3, 27.843, 23.39, 25.437, 26.292, 21.084, 19.116, 16.698, 18.01, 26.235, 23.956, 18.872, 22.672, 22.318, 21.348, 16.37, 12.491, 14.541, 6.426, 8.099, 4.521, 3.533, 3.818, 2.661, 2.014, 1.27, 0.61, 0.147, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.103, 0.682, 1.416, 2.311, 4.239, 6.918, 6.916, 9.275, 9.132, 7.727, 10.718, 11.675, 12.998, 17.473, 17.302, 17.687, 18.251, 16.705, 22.742, 24.517, 19.578, 18.607, 18.895, 12.406, 14.551, 13.923, 13.607, 15.402, 17.125, 21.259, 20.178, 23.086, 27.895, 23.782, 17.02, 13.874, 18.501, 21.374, 14.291, 12.68, 12.534, 8.932, 6.195, 4.736, 3.8, 3.586, 2.181, 1.23, 0.831, 0.531, 0.134, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.203, 0.974, 2.063, 3.147, 4.511, 4.646, 4.14, 7.958, 13.487, 16.264, 16.294, 15.867, 17.212, 19.134, 19.15, 18.8, 18.756, 25.4, 20.982, 23.059, 22.129, 16.792, 17.741, 19.009, 20.592, 13.306, 12.362, 14.115, 21.745, 12.678, 7.675, 7.347, 8.722, 13.289, 21.6, 14.927, 13.902, 13.595, 11.505, 13.544, 3.885, 5.327, 7.545, 8.776, 6.028, 4.9, 3.086, 2.641, 1.137, 0.502, 0.037, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.008, 0.402, 1.472, 2.149, 3.092, 5.069, 6.105, 7.677, 10.555, 9.955, 12.533, 12.573, 12.538, 14.087, 16.211, 19.016, 24.083, 22.378, 18.202, 20.211, 24.978, 18.069, 12.78, 16.211, 7.269, 13.299, 14.177, 15.523, 10.306, 15.73, 17.425, 12.895, 14.159, 9.508, 21.146, 15.641, 8.844, 10.091, 13.945, 10.881, 10.713, 7.556, 5.707, 4.762, 4.136, 3.741, 3.108, 2.22, 1.481, 0.732, 0.159, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.006, 0.877, 2.946, 4.463, 7.062, 8.218, 7.406, 8.184, 8.801, 8.453, 10.911, 11.63, 14.853, 12.307, 13.464, 14.484, 15.639, 14.239, 14.51, 17.199, 16.549, 24.774, 24.771, 29.049, 20.619, 21.656, 15.16, 19.014, 21.044, 17.746, 13.531, 13.048, 17.948, 16.852, 10.255, 3.342, 1.928, 3.026, 6.923, 7.88, 3.955, 2.421, 2.819, 3.357, 2.87, 2.022, 1.289, 0.72, 0.166, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "phys": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.034, 0.306, 0.99, 1.867, 2.508, 3.828, 4.671, 5.878, 9.119, 9.303, 7.429, 11.875, 15.517, 14.445, 19.545, 24.084, 24.277, 25.948, 22.333, 25.376, 24.003, 25.11, 23.355, 21.711, 22.131, 21.991, 18.208, 25.822, 16.947, 21.432, 19.953, 19.202, 23.365, 21.734, 22.897, 22.286, 18.883, 21.387, 20.367, 13.688, 13.625, 10.017, 7.588, 11.678, 11.676, 7.525, 5.352, 4.787, 3.307, 2.228, 1.121, 0.316, 0.027, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.032, 0.421, 1.164, 1.869, 3.143, 6.447, 7.483, 7.44, 6.24, 12.335, 14.337, 16.243, 17.027, 18.97, 17.176, 20.163, 20.647, 12.099, 22.495, 25.703, 26.539, 26.259, 25.464, 17.93, 25.46, 19.78, 17.878, 22.432, 22.274, 23.78, 23.276, 18.626, 19.2, 12.614, 13.786, 17.332, 15.881, 16.555, 17.009, 17.562, 15.673, 13.654, 11.82, 10.96, 9.099, 7.067, 5.983, 4.677, 3.217, 1.943, 0.976, 0.268, 0.005, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.008, 0.295, 1.024, 1.941, 3.059, 5.639, 7.107, 8.766, 10.385, 9.113, 6.329, 7.636, 14.351, 14.172, 17.405, 16.974, 13.254, 9.688, 14.442, 15.089, 12.787, 9.615, 17.978, 19.774, 19.98, 29.071, 24.379, 24.423, 24.224, 19.996, 16.683, 24.304, 18.605, 15.648, 19.571, 12.819, 1.994, 4.175, 6.843, 9.102, 7.625, 8.372, 10.773, 7.424, 5.966, 5.2, 5.278, 3.164, 2.596, 1.224, 0.29, 0.043, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.081, 0.374, 0.792, 1.125, 1.665, 2.467, 2.996, 4.127, 5.316, 5.922, 6.119, 6.837, 7.523, 8.261, 8.802, 9.437, 10.208, 11.143, 11.346, 11.775, 14.614, 15.845, 14.77, 16.605, 18.771, 18.065, 16.303, 11.509, 13.74, 14.957, 10.071, 12.949, 13.838, 19.291, 20.408, 12.814, 15.59, 12.883, 15.083, 12.67, 10.117, 9.216, 7.529, 6.65, 5.145, 4.065, 3.053, 2.143, 1.403, 0.683, 0.19, 0.002, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.004, 0.11, 0.431, 0.832, 1.517, 2.023, 2.274, 1.975, 2.683, 3.791, 5.845, 6.587, 8.556, 10.538, 12.427, 10.958, 13.434, 11.82, 15.35, 16.883, 13.293, 11.937, 16.339, 20.096, 19.219, 20.927, 14.792, 14.323, 16.189, 16.659, 15.853, 17.051, 19.554, 18.249, 15.263, 13.288, 12.433, 11.923, 10.227, 12.112, 9.444, 6.074, 5.664, 5.785, 5.617, 4.227, 3.983, 4.944, 3.625, 1.877, 0.837, 0.246, 0.005, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.005, 0.272, 0.866, 1.42, 2.426, 5.182, 7.147, 8.68, 10.508, 12.307, 14.402, 15.351, 15.44, 17.376, 17.625, 18.089, 19.56, 17.868, 22.057, 24.654, 21.121, 23.393, 27.195, 24.027, 28.431, 26.839, 25.016, 25.006, 25.724, 20.455, 17.908, 15.82, 17.901, 26.326, 23.418, 18.209, 22.242, 21.169, 21.686, 16.481, 12.028, 13.701, 6.625, 7.788, 4.605, 3.57, 3.917, 2.784, 2.188, 1.452, 0.712, 0.232, 0.004, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.016, 0.229, 0.777, 1.564, 2.457, 4.664, 7.076, 6.893, 9.554, 9.217, 7.669, 10.453, 11.743, 13.017, 17.019, 16.556, 16.91, 17.244, 15.728, 21.584, 24.608, 18.539, 19.09, 19.265, 12.81, 14.829, 14.321, 13.839, 15.694, 17.587, 21.708, 21.18, 26.155, 33.47, 25.037, 16.162, 13.265, 17.391, 20.47, 13.53, 12.247, 12.06, 8.67, 6.132, 4.802, 3.861, 3.512, 2.237, 1.354, 0.944, 0.605, 0.215, 0.015, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.018, 0.313, 1.076, 2.181, 3.275, 4.931, 5.035, 4.193, 8.229, 13.968, 15.971, 17.086, 15.789, 16.941, 19.473, 18.929, 18.843, 18.126, 25.57, 19.437, 25.044, 20.034, 16.666, 18.561, 19.452, 21.786, 12.694, 11.664, 13.516, 21.368, 12.464, 7.358, 6.902, 8.239, 12.92, 19.175, 14.049, 12.567, 13.423, 11.49, 13.428, 3.825, 5.039, 7.331, 8.472, 5.943, 4.843, 3.167, 2.687, 1.221, 0.576, 0.128, 0.006, 0.001, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.001, 0.124, 0.456, 1.503, 2.253, 3.234, 5.294, 6.468, 8.048, 10.876, 9.864, 12.271, 12.518, 12.423, 13.854, 16.508, 18.763, 24.035, 20.637, 17.116, 19.657, 25.875, 17.218, 12.391, 15.315, 6.679, 12.986, 14.103, 14.63, 9.463, 14.961, 16.98, 12.15, 12.676, 9.15, 21.133, 15.169, 8.448, 9.695, 12.862, 10.752, 10.436, 7.54, 5.833, 4.995, 4.317, 3.855, 3.207, 2.295, 1.545, 0.786, 0.225, 0.002, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.092, 1.451, 2.973, 4.552, 7.135, 8.319, 7.268, 8.075, 8.476, 8.103, 10.35, 11.202, 14.057, 11.58, 12.809, 13.636, 14.948, 13.817, 13.629, 16.685, 15.911, 25.939, 25.448, 28.989, 20.429, 20.211, 14.397, 17.784, 19.297, 17.516, 12.983, 12.293, 17.308, 15.639, 9.482, 3.187, 1.748, 2.741, 6.346, 7.348, 3.701, 2.257, 2.741, 3.306, 2.842, 2.065, 1.332, 0.748, 0.224, 0.001, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "ml": [0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.186, 0.907, 1.756, 2.347, 3.726, 4.272, 5.763, 8.154, 9.049, 7.411, 11.173, 15.116, 14.845, 19.083, 24.946, 24.174, 24.98, 21.827, 25.358, 23.632, 25.051, 22.846, 22.341, 22.333, 21.686, 18.551, 26.11, 16.948, 21.296, 18.825, 19.475, 23.145, 21.24, 23.241, 21.804, 19.455, 21.855, 21.019, 14.243, 14.128, 10.389, 7.576, 11.533, 11.366, 7.229, 4.981, 4.459, 3.121, 2.194, 1.03, 0.192, 0.007, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.32, 1.019, 1.756, 2.807, 5.407, 6.554, 6.859, 5.884, 11.521, 13.38, 15.686, 16.083, 19.081, 17.148, 19.735, 19.666, 12.715, 21.879, 25.102, 25.034, 25.335, 24.958, 18.37, 24.863, 21.336, 18.174, 21.635, 20.879, 23.771, 23.733, 18.833, 20.056, 13.425, 13.865, 17.893, 16.358, 17.004, 16.848, 17.671, 15.975, 13.94, 12.094, 10.67, 8.893, 6.736, 5.724, 4.332, 3.087, 1.88, 0.918, 0.174, 0.007, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.186, 0.907, 1.756, 2.807, 4.74, 6.328, 7.833, 9.625, 9.073, 6.242, 7.643, 13.891, 14.311, 17.196, 16.641, 13.708, 9.702, 14.49, 15.312, 13.589, 9.435, 18.04, 20.557, 20.411, 27.395, 24.244, 23.541, 24.173, 21.212, 16.632, 25.158, 19.592, 16.223, 20.642, 13.808, 2.133, 4.077, 7.291, 9.624, 8.079, 8.5, 11.275, 7.696, 5.972, 5.203, 5.105, 3.094, 2.522, 1.131, 0.195, 0.039, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.022, 0.233, 0.605, 1.019, 1.524, 2.355, 2.946, 4.012, 5.371, 6.004, 6.07, 7.137, 7.924, 8.548, 9.083, 9.853, 11.023, 11.706, 11.833, 12.279, 15.551, 16.688, 16.341, 17.396, 19.701, 18.296, 16.943, 12.0, 14.732, 15.937, 10.424, 13.504, 14.402, 19.699, 20.854, 13.483, 15.953, 13.529, 15.737, 12.992, 10.295, 9.491, 7.633, 6.538, 4.971, 3.96, 2.785, 1.993, 1.282, 0.576, 0.083, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.022, 0.32, 0.775, 1.41, 1.896, 2.21, 1.903, 2.582, 3.915, 6.042, 6.281, 8.327, 10.917, 13.008, 11.465, 13.996, 12.303, 15.864, 17.214, 14.283, 12.346, 17.147, 20.679, 20.415, 21.418, 15.969, 15.387, 16.946, 17.276, 16.731, 17.103, 19.987, 18.448, 15.695, 13.885, 12.589, 12.126, 10.464, 12.733, 9.537, 6.184, 6.079, 5.992, 5.939, 4.234, 3.96, 4.546, 3.553, 1.76, 0.781, 0.129, 0.007, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.167, 0.775, 1.283, 2.203, 4.549, 6.426, 7.833, 9.636, 11.54, 13.368, 14.32, 15.108, 16.951, 17.385, 17.753, 18.865, 17.529, 21.636, 24.55, 21.49, 22.087, 26.706, 24.787, 26.741, 26.472, 24.642, 25.186, 25.311, 19.923, 17.917, 16.657, 18.359, 27.282, 24.813, 19.009, 22.68, 22.26, 21.972, 16.94, 12.484, 14.206, 7.069, 7.929, 4.692, 3.736, 3.96, 2.541, 1.993, 1.414, 0.611, 0.126, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.123, 0.605, 1.479, 2.347, 4.167, 6.375, 6.633, 8.489, 8.995, 7.73, 10.509, 11.863, 13.567, 16.822, 16.449, 16.457, 16.987, 16.293, 20.953, 23.176, 19.914, 20.276, 20.025, 13.794, 15.903, 15.252, 14.784, 16.724, 17.92, 22.146, 22.174, 27.304, 27.374, 25.503, 16.928, 13.908, 17.653, 21.579, 14.724, 12.674, 12.68, 8.842, 6.069, 4.804, 4.058, 3.638, 2.193, 1.286, 0.878, 0.541, 0.161, 0.039, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.186, 0.915, 2.007, 3.116, 4.397, 4.382, 4.191, 7.36, 13.336, 15.199, 15.913, 15.284, 16.529, 19.136, 18.934, 18.839, 17.942, 25.669, 20.089, 24.685, 20.577, 17.169, 19.703, 19.834, 21.558, 13.739, 11.706, 14.16, 21.846, 13.413, 7.702, 7.139, 8.345, 13.707, 19.964, 14.374, 13.356, 13.784, 11.793, 13.435, 4.125, 5.204, 7.406, 8.547, 5.81, 4.629, 3.094, 2.485, 1.135, 0.543, 0.05, 0.007, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.043, 0.32, 1.41, 2.203, 3.112, 4.743, 5.854, 7.36, 10.432, 9.487, 11.876, 12.486, 12.674, 14.285, 16.403, 18.649, 23.003, 20.912, 17.517, 20.238, 25.428, 18.706, 12.822, 16.309, 7.045, 13.817, 15.338, 16.01, 9.455, 15.937, 17.379, 12.398, 13.121, 9.216, 21.126, 15.667, 8.659, 9.423, 13.109, 10.635, 10.354, 7.611, 5.937, 5.077, 4.279, 3.914, 3.094, 2.193, 1.478, 0.611, 0.129, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003, 0.022, 1.283, 2.896, 4.272, 6.698, 7.453, 7.464, 8.02, 8.589, 8.09, 10.846, 11.544, 14.318, 11.988, 13.416, 14.029, 15.958, 14.887, 14.375, 17.261, 16.772, 26.257, 26.488, 27.175, 21.064, 20.976, 15.329, 17.8, 19.854, 17.822, 13.671, 12.203, 17.182, 16.474, 9.274, 3.326, 1.716, 2.702, 6.261, 7.863, 4.102, 2.485, 2.728, 3.272, 2.817, 1.988, 1.265, 0.608, 0.126, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004], "hyb": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.012, 0.209, 0.892, 1.769, 2.414, 3.631, 4.485, 5.636, 8.361, 8.977, 7.451, 11.496, 15.076, 14.751, 19.354, 24.588, 24.257, 25.703, 21.455, 25.364, 23.868, 25.146, 22.867, 22.889, 23.017, 22.275, 18.464, 26.161, 16.615, 21.24, 19.769, 19.594, 23.025, 20.98, 23.138, 21.344, 19.168, 21.833, 21.287, 14.809, 14.38, 10.09, 7.589, 11.815, 11.483, 7.289, 5.068, 4.514, 3.146, 2.18, 1.071, 0.266, 0.015, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.001, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.01, 0.323, 1.066, 1.771, 2.969, 5.477, 6.557, 6.769, 5.837, 11.53, 13.616, 15.378, 16.213, 19.158, 16.874, 20.079, 19.462, 12.695, 21.568, 25.418, 24.282, 24.885, 25.255, 18.601, 24.893, 20.555, 17.938, 21.375, 20.303, 23.644, 23.381, 18.701, 20.028, 13.322, 14.456, 17.763, 16.614, 17.269, 17.234, 17.849, 16.111, 14.062, 11.694, 10.787, 8.846, 6.911, 5.688, 4.357, 3.101, 1.893, 0.926, 0.218, 0.004, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.197, 0.926, 1.843, 2.885, 4.91, 6.172, 7.73, 9.3, 8.787, 6.304, 7.669, 13.951, 14.362, 17.205, 16.794, 13.892, 10.013, 15.042, 15.309, 13.317, 10.035, 18.238, 20.39, 21.112, 27.301, 23.857, 23.542, 24.522, 20.907, 16.873, 24.811, 19.017, 16.327, 20.373, 13.686, 2.466, 4.578, 7.393, 9.644, 8.102, 8.805, 11.026, 7.502, 6.054, 5.234, 5.063, 3.047, 2.546, 1.174, 0.238, 0.021, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.017, 0.277, 0.695, 1.036, 1.575, 2.388, 3.05, 4.221, 5.273, 5.93, 6.112, 7.035, 7.889, 8.772, 9.321, 9.955, 10.706, 11.776, 11.925, 12.403, 15.426, 16.697, 15.588, 17.393, 19.578, 18.529, 16.541, 11.854, 14.651, 15.461, 10.416, 13.316, 14.06, 19.685, 21.194, 13.173, 16.012, 13.293, 15.447, 12.954, 10.032, 9.349, 7.592, 6.738, 5.198, 3.869, 2.935, 2.093, 1.353, 0.633, 0.14, 0.001, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.046, 0.333, 0.734, 1.42, 1.929, 2.195, 2.0, 2.747, 3.891, 5.851, 6.641, 8.754, 10.877, 12.919, 11.487, 13.998, 12.34, 15.908, 17.332, 13.959, 12.743, 17.134, 20.875, 20.414, 21.629, 15.596, 14.861, 16.789, 17.434, 16.494, 17.301, 19.71, 18.618, 15.53, 13.665, 12.708, 11.963, 10.568, 12.475, 9.7, 6.386, 5.894, 5.874, 5.7, 4.273, 3.898, 4.715, 3.508, 1.827, 0.787, 0.196, 0.004, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.001, 0.001, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.175, 0.769, 1.323, 2.324, 4.463, 6.264, 7.73, 9.423, 11.5, 13.68, 14.565, 14.994, 16.948, 17.365, 17.912, 19.22, 17.185, 21.515, 24.719, 21.546, 21.882, 26.646, 24.917, 26.818, 25.924, 24.62, 25.267, 25.684, 20.101, 18.167, 16.547, 18.299, 26.563, 24.783, 19.034, 22.179, 22.166, 21.989, 16.991, 12.295, 14.177, 6.821, 7.866, 4.682, 3.617, 3.832, 2.667, 2.138, 1.402, 0.662, 0.18, 0.004, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.001, 0.001, 0.001, 0.001, 0.001, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.003, 0.13, 0.678, 1.465, 2.345, 4.366, 6.141, 6.222, 8.722, 8.907, 7.707, 10.295, 11.664, 13.391, 16.881, 16.704, 16.633, 16.951, 16.329, 21.431, 24.477, 19.969, 20.6, 20.054, 13.735, 15.529, 14.947, 14.526, 16.392, 18.139, 22.186, 21.816, 26.477, 31.418, 26.22, 16.779, 13.757, 17.745, 21.742, 14.759, 12.654, 12.467, 8.906, 6.211, 4.884, 3.908, 3.427, 2.187, 1.304, 0.894, 0.553, 0.163, 0.014, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.006, 0.216, 0.978, 2.087, 3.11, 4.286, 4.421, 4.106, 7.547, 13.055, 15.091, 16.016, 15.249, 16.557, 19.045, 18.708, 18.65, 17.954, 25.459, 20.147, 25.191, 21.202, 17.427, 19.708, 20.091, 22.307, 13.18, 11.8, 14.207, 21.684, 12.965, 7.615, 7.255, 8.708, 13.506, 19.955, 14.551, 13.114, 13.884, 11.764, 13.662, 4.168, 5.269, 7.41, 8.509, 5.93, 4.646, 3.05, 2.612, 1.171, 0.526, 0.078, 0.005, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.025, 0.357, 1.404, 2.141, 3.099, 4.679, 5.797, 7.366, 10.295, 9.577, 11.891, 12.344, 12.623, 14.076, 16.677, 18.462, 23.948, 20.626, 17.844, 20.067, 25.763, 18.541, 13.055, 16.235, 7.076, 13.578, 15.089, 15.62, 9.87, 15.472, 17.584, 12.39, 12.945, 9.391, 21.292, 15.77, 8.652, 9.959, 13.26, 10.769, 10.791, 7.701, 5.864, 5.063, 4.364, 3.77, 3.089, 2.245, 1.495, 0.736, 0.175, 0.002, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.002, 0.0, 0.0, 0.028, 1.362, 2.881, 4.366, 6.581, 7.654, 7.211, 8.041, 8.458, 8.277, 10.674, 11.701, 14.279, 11.993, 13.367, 14.604, 15.555, 14.963, 14.78, 17.46, 16.674, 26.242, 26.411, 27.313, 21.171, 21.136, 14.917, 17.866, 19.953, 17.685, 13.32, 12.349, 17.316, 16.312, 9.524, 3.551, 2.214, 3.119, 6.787, 7.643, 3.77, 2.305, 2.78, 3.219, 2.722, 2.013, 1.28, 0.695, 0.172, 0.001, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001], "G": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.001, 0.009, 0.031, 0.058, 0.078, 0.12, 0.147, 0.186, 0.293, 0.303, 0.242, 0.388, 0.52, 0.487, 0.661, 0.846, 0.86, 0.923, 0.793, 0.89, 0.842, 0.887, 0.821, 0.756, 0.768, 0.76, 0.627, 0.894, 0.589, 0.745, 0.71, 0.666, 0.824, 0.773, 0.805, 0.792, 0.668, 0.748, 0.71, 0.47, 0.465, 0.338, 0.25, 0.383, 0.389, 0.249, 0.174, 0.155, 0.106, 0.071, 0.036, 0.01, 0.001, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.001, 0.013, 0.036, 0.058, 0.098, 0.202, 0.237, 0.237, 0.199, 0.402, 0.479, 0.546, 0.577, 0.65, 0.594, 0.693, 0.719, 0.406, 0.767, 0.907, 0.95, 0.94, 0.923, 0.622, 0.917, 0.697, 0.63, 0.78, 0.79, 0.849, 0.851, 0.665, 0.674, 0.438, 0.467, 0.598, 0.543, 0.574, 0.582, 0.601, 0.534, 0.462, 0.397, 0.366, 0.302, 0.232, 0.195, 0.151, 0.103, 0.062, 0.031, 0.008, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.009, 0.032, 0.06, 0.095, 0.177, 0.225, 0.282, 0.338, 0.299, 0.206, 0.248, 0.474, 0.478, 0.587, 0.577, 0.447, 0.32, 0.48, 0.51, 0.429, 0.32, 0.601, 0.683, 0.685, 1.031, 0.869, 0.869, 0.865, 0.705, 0.575, 0.853, 0.655, 0.538, 0.68, 0.445, 0.064, 0.131, 0.216, 0.292, 0.247, 0.272, 0.354, 0.244, 0.193, 0.167, 0.17, 0.101, 0.083, 0.039, 0.009, 0.001, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.002, 0.012, 0.025, 0.035, 0.052, 0.077, 0.094, 0.13, 0.169, 0.189, 0.196, 0.22, 0.243, 0.268, 0.287, 0.308, 0.334, 0.366, 0.375, 0.389, 0.487, 0.532, 0.496, 0.561, 0.638, 0.614, 0.552, 0.385, 0.461, 0.502, 0.336, 0.429, 0.463, 0.654, 0.703, 0.435, 0.524, 0.433, 0.505, 0.424, 0.335, 0.302, 0.245, 0.214, 0.163, 0.13, 0.097, 0.068, 0.044, 0.021, 0.006, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.003, 0.013, 0.026, 0.047, 0.063, 0.071, 0.062, 0.084, 0.119, 0.185, 0.208, 0.273, 0.34, 0.407, 0.359, 0.442, 0.39, 0.509, 0.559, 0.442, 0.393, 0.54, 0.675, 0.654, 0.723, 0.507, 0.484, 0.544, 0.563, 0.537, 0.576, 0.669, 0.626, 0.518, 0.447, 0.415, 0.396, 0.338, 0.4, 0.312, 0.198, 0.183, 0.187, 0.181, 0.136, 0.127, 0.158, 0.116, 0.06, 0.026, 0.008, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.008, 0.027, 0.044, 0.075, 0.162, 0.226, 0.278, 0.341, 0.404, 0.478, 0.514, 0.521, 0.59, 0.598, 0.617, 0.671, 0.615, 0.758, 0.864, 0.74, 0.817, 0.962, 0.855, 1.017, 0.958, 0.889, 0.881, 0.907, 0.725, 0.6, 0.537, 0.598, 0.898, 0.813, 0.627, 0.766, 0.734, 0.748, 0.567, 0.404, 0.46, 0.22, 0.254, 0.149, 0.115, 0.125, 0.089, 0.069, 0.046, 0.022, 0.007, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.001, 0.007, 0.024, 0.049, 0.077, 0.147, 0.226, 0.22, 0.307, 0.298, 0.245, 0.335, 0.382, 0.428, 0.566, 0.557, 0.572, 0.586, 0.529, 0.72, 0.833, 0.641, 0.65, 0.662, 0.426, 0.492, 0.473, 0.455, 0.519, 0.576, 0.734, 0.728, 0.907, 1.222, 0.91, 0.564, 0.45, 0.587, 0.709, 0.46, 0.408, 0.401, 0.285, 0.199, 0.154, 0.124, 0.112, 0.071, 0.043, 0.03, 0.019, 0.007, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.001, 0.01, 0.033, 0.068, 0.103, 0.156, 0.16, 0.133, 0.264, 0.459, 0.536, 0.579, 0.534, 0.573, 0.663, 0.643, 0.645, 0.617, 0.889, 0.68, 0.861, 0.703, 0.574, 0.637, 0.664, 0.744, 0.433, 0.39, 0.455, 0.732, 0.427, 0.245, 0.226, 0.269, 0.423, 0.652, 0.477, 0.423, 0.451, 0.382, 0.45, 0.125, 0.163, 0.238, 0.276, 0.194, 0.157, 0.102, 0.086, 0.039, 0.018, 0.004, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.004, 0.014, 0.047, 0.071, 0.102, 0.167, 0.206, 0.258, 0.354, 0.323, 0.402, 0.415, 0.411, 0.46, 0.552, 0.636, 0.829, 0.72, 0.591, 0.675, 0.918, 0.599, 0.421, 0.522, 0.222, 0.429, 0.483, 0.503, 0.319, 0.503, 0.582, 0.409, 0.43, 0.305, 0.718, 0.526, 0.282, 0.32, 0.427, 0.359, 0.346, 0.248, 0.19, 0.161, 0.139, 0.124, 0.102, 0.073, 0.049, 0.025, 0.007, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.003, 0.045, 0.093, 0.144, 0.228, 0.268, 0.235, 0.261, 0.275, 0.263, 0.338, 0.367, 0.466, 0.383, 0.425, 0.454, 0.501, 0.465, 0.451, 0.564, 0.537, 0.893, 0.897, 1.031, 0.719, 0.7, 0.489, 0.602, 0.659, 0.599, 0.438, 0.411, 0.587, 0.535, 0.317, 0.104, 0.055, 0.086, 0.2, 0.235, 0.119, 0.072, 0.086, 0.105, 0.09, 0.065, 0.042, 0.023, 0.007, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, "inverters": [{"id": "INV-12", "ratio": 0.9207, "flag": true, "daily": [0.907, 0.94, 0.921, 0.918, 0.917, 0.922, 0.919, 0.952, 0.931, 0.925, 0.915, 0.922, 0.928, 0.928, 0.919, 0.909, 0.932, 0.899, 0.922, 0.927, 0.925, 0.927, 0.93, 0.916, 0.913, 0.918, 0.931, 0.917, 0.92, 0.937, 0.898, 0.905, 0.913, 0.92]}, {"id": "INV-01", "ratio": 0.9331, "flag": true, "daily": [0.899, 0.96, 0.958, 0.93, 0.923, 0.939, 0.922, 0.955, 0.947, 0.938, 0.934, 0.948, 0.917, 0.944, 0.935, 0.924, 0.932, 0.943, 0.934, 0.941, 0.931, 0.933, 0.937, 0.93, 0.933, 0.914, 0.922, 0.926, 0.934, 0.946, 0.905, 0.92, 0.933, 0.931]}, {"id": "INV-14", "ratio": 0.9816, "flag": false, "daily": [0.988, 0.99, 0.991, 0.983, 0.987, 0.98, 0.985, 0.987, 0.988, 0.972, 0.971, 0.993, 0.978, 0.996, 0.979, 0.98, 1.023, 0.986, 0.981, 0.987, 0.983, 0.975, 0.986, 0.98, 0.981, 0.982, 0.966, 0.972, 0.979, 0.988, 0.98, 0.968, 0.975, 0.974]}, {"id": "INV-10", "ratio": 0.9911, "flag": false, "daily": [0.998, 0.991, 0.989, 0.994, 0.994, 0.986, 0.986, 0.977, 0.993, 0.997, 0.988, 0.993, 1.001, 0.986, 0.993, 0.995, 0.969, 1.003, 0.988, 0.987, 0.997, 0.998, 0.986, 0.987, 0.996, 0.99, 0.999, 0.984, 0.984, 0.99, 0.991, 0.978, 0.999, 0.991]}, {"id": "INV-04", "ratio": 0.9926, "flag": false, "daily": [0.978, 0.991, 1.001, 0.982, 0.993, 0.997, 0.996, 1.0, 0.994, 1.008, 0.996, 1.006, 0.99, 0.996, 0.995, 0.977, 0.986, 1.003, 0.983, 0.993, 0.974, 0.969, 1.018, 0.99, 0.993, 0.977, 0.987, 0.984, 0.981, 1.002, 0.999, 0.998, 0.992, 0.991]}, {"id": "INV-07", "ratio": 0.997, "flag": false, "daily": [0.994, 1.01, 1.026, 0.992, 0.975, 1.004, 0.991, 1.032, 1.0, 0.995, 1.002, 1.014, 0.984, 1.005, 0.994, 0.98, 0.988, 1.03, 0.979, 0.997, 0.994, 0.999, 0.999, 0.993, 1.0, 0.978, 0.993, 0.995, 0.994, 0.997, 1.009, 0.997, 1.017, 1.002]}, {"id": "INV-17", "ratio": 0.999, "flag": false, "daily": [0.995, 0.997, 0.993, 0.998, 1.007, 0.994, 0.986, 0.986, 0.998, 0.991, 0.995, 0.996, 1.002, 0.996, 0.993, 0.997, 0.999, 1.004, 1.004, 0.999, 1.003, 1.009, 1.002, 0.996, 0.999, 1.007, 1.001, 0.999, 1.002, 0.999, 0.999, 1.001, 0.999, 1.0]}, {"id": "INV-20", "ratio": 0.9991, "flag": false, "daily": [1.011, 0.999, 1.001, 0.989, 1.002, 0.999, 1.003, 0.988, 1.0, 1.0, 1.003, 1.005, 0.999, 1.011, 0.996, 0.998, 1.057, 1.002, 0.998, 1.004, 1.003, 0.993, 0.999, 0.992, 0.944, 0.986, 1.002, 0.987, 0.993, 0.996, 0.996, 1.002, 1.005, 0.98]}, {"id": "INV-08", "ratio": 0.9996, "flag": false, "daily": [1.004, 1.0, 1.001, 0.995, 1.0, 1.0, 1.001, 1.004, 1.001, 1.004, 1.0, 1.001, 1.002, 0.999, 1.0, 1.001, 0.995, 1.0, 0.999, 0.996, 0.999, 0.996, 0.994, 1.002, 1.0, 0.998, 0.993, 0.991, 0.99, 0.997, 0.989, 0.973, 0.999, 0.996]}, {"id": "INV-16", "ratio": 0.9998, "flag": false, "daily": [1.027, 0.984, 0.993, 1.007, 1.002, 0.992, 1.01, 0.937, 0.979, 1.002, 0.993, 1.004, 1.024, 0.992, 1.0, 1.016, 0.997, 0.994, 0.999, 0.995, 1.007, 1.016, 0.993, 0.999, 1.001, 1.013, 1.001, 1.003, 1.002, 0.999, 0.999, 0.991, 0.998, 1.001]}, {"id": "INV-15", "ratio": 1.0007, "flag": false, "daily": [1.007, 0.983, 0.992, 1.002, 1.0, 0.992, 0.998, 1.002, 0.994, 1.0, 0.992, 0.989, 1.032, 0.992, 1.003, 1.008, 0.996, 0.985, 1.001, 0.999, 1.007, 1.009, 0.993, 1.002, 1.004, 1.026, 1.015, 1.001, 1.001, 0.99, 0.992, 1.002, 1.007, 1.003]}, {"id": "INV-21", "ratio": 1.0009, "flag": false, "daily": [1.012, 0.996, 0.995, 1.006, 1.006, 1.0, 1.007, 1.017, 1.007, 0.915, 0.954, 0.953, 0.963, 0.95, 0.967, 1.019, 0.992, 1.006, 1.005, 1.003, 1.007, 1.013, 0.994, 1.004, 1.001, 1.001, 1.005, 1.0, 1.0, 1.003, 1.0, 1.004, 0.975, 0.98]}, {"id": "INV-22", "ratio": 1.0019, "flag": false, "daily": [1.002, 0.998, 1.001, 1.0, 1.016, 0.999, 1.012, 1.003, 0.998, 1.0, 1.0, 0.998, 1.011, 1.002, 1.008, 1.001, 1.009, 0.996, 1.001, 1.0, 1.013, 1.013, 1.01, 1.015, 1.016, 1.026, 1.005, 1.003, 1.003, 0.985, 1.0, 1.005, 0.999, 1.0]}, {"id": "INV-19", "ratio": 1.0052, "flag": false, "daily": [1.011, 0.996, 0.995, 1.0, 1.016, 1.009, 0.996, 0.999, 1.003, 1.012, 1.009, 0.999, 1.011, 1.007, 1.008, 1.008, 1.026, 0.996, 1.005, 1.007, 1.005, 1.007, 0.991, 0.998, 1.007, 0.997, 1.007, 0.997, 1.001, 1.006, 1.004, 1.011, 1.004, 1.002]}, {"id": "INV-13", "ratio": 1.0054, "flag": false, "daily": [1.015, 1.002, 1.002, 1.004, 1.012, 1.001, 1.001, 1.003, 1.0, 1.003, 1.005, 1.002, 1.012, 0.998, 1.013, 1.012, 0.995, 0.998, 1.006, 1.0, 1.011, 1.026, 1.001, 1.015, 1.01, 1.012, 1.014, 1.006, 1.008, 1.011, 1.009, 0.999, 1.004, 1.006]}, {"id": "INV-09", "ratio": 1.0075, "flag": false, "daily": [1.008, 1.025, 1.005, 1.006, 1.007, 1.009, 1.009, 1.009, 1.01, 1.005, 1.008, 1.017, 1.021, 1.019, 1.003, 1.003, 1.021, 1.009, 1.017, 1.017, 1.007, 0.997, 1.004, 1.005, 1.006, 1.009, 0.994, 1.003, 1.007, 1.017, 1.013, 0.998, 1.003, 1.004]}, {"id": "INV-18", "ratio": 1.0084, "flag": false, "daily": [0.998, 0.992, 0.999, 1.005, 1.006, 1.002, 1.034, 1.018, 0.999, 1.004, 1.001, 1.003, 1.045, 1.003, 1.021, 1.007, 1.009, 0.991, 1.012, 1.009, 1.014, 1.017, 1.008, 1.008, 1.012, 1.03, 1.013, 1.01, 1.008, 1.0, 1.0, 1.022, 1.009, 1.01]}, {"id": "INV-06", "ratio": 1.0136, "flag": false, "daily": [0.995, 1.026, 1.029, 1.013, 1.01, 1.021, 1.013, 1.026, 1.022, 1.02, 1.02, 1.014, 1.012, 1.016, 1.005, 0.998, 1.016, 1.011, 1.006, 1.014, 1.008, 1.0, 1.031, 1.008, 1.016, 1.002, 0.995, 1.007, 1.008, 1.026, 1.024, 1.032, 1.018, 1.01]}, {"id": "INV-02", "ratio": 1.0142, "flag": false, "daily": [1.0, 1.029, 1.036, 1.006, 1.009, 1.023, 1.019, 1.008, 1.019, 1.023, 1.022, 1.041, 1.017, 1.03, 1.02, 1.008, 0.99, 1.066, 1.007, 1.018, 1.003, 1.0, 1.014, 1.012, 1.019, 1.001, 1.014, 1.014, 1.01, 1.021, 1.014, 1.022, 1.01, 1.013]}, {"id": "INV-03", "ratio": 1.0153, "flag": false, "daily": [0.986, 1.029, 1.041, 1.01, 0.994, 1.023, 1.01, 1.014, 1.022, 1.009, 1.025, 1.04, 0.985, 1.025, 1.011, 1.004, 0.99, 1.039, 0.999, 1.017, 1.002, 1.035, 1.012, 1.014, 1.019, 1.014, 1.016, 1.01, 1.012, 1.026, 1.02, 1.016, 1.02, 1.018]}, {"id": "INV-05", "ratio": 1.0192, "flag": false, "daily": [1.024, 1.017, 1.016, 1.014, 1.016, 1.018, 1.019, 1.005, 1.018, 1.015, 1.02, 1.021, 1.027, 1.021, 1.015, 1.016, 1.052, 1.024, 1.017, 1.025, 1.028, 1.028, 1.01, 1.017, 1.02, 1.024, 1.017, 1.015, 1.02, 1.025, 1.019, 1.029, 1.014, 1.021]}, {"id": "INV-11", "ratio": 1.0273, "flag": false, "daily": [1.006, 1.041, 1.046, 1.018, 1.015, 1.035, 1.029, 1.012, 1.028, 1.044, 1.037, 1.051, 1.028, 1.044, 1.025, 1.013, 1.003, 1.08, 1.021, 1.036, 1.025, 1.01, 1.037, 1.029, 1.039, 1.0, 1.02, 1.025, 1.025, 1.031, 1.033, 1.027, 1.023, 1.022]}], "days": ["2020-05-15", "2020-05-16", "2020-05-17", "2020-05-18", "2020-05-19", "2020-05-20", "2020-05-21", "2020-05-22", "2020-05-23", "2020-05-24", "2020-05-25", "2020-05-26", "2020-05-27", "2020-05-28", "2020-05-29", "2020-05-30", "2020-05-31", "2020-06-01", "2020-06-02", "2020-06-03", "2020-06-04", "2020-06-05", "2020-06-06", "2020-06-07", "2020-06-08", "2020-06-09", "2020-06-10", "2020-06-11", "2020-06-12", "2020-06-13", "2020-06-14", "2020-06-15", "2020-06-16", "2020-06-17"], "losses": {"flagged": 2, "lost_mwh_period": 47.0, "lost_mwh_year": 505.0, "lost_pct_of_production": 0.89, "price_eur_mwh": 60, "lost_eur_year": 30300}};
+const $ = (id) => document.getElementById(id);
+const pct = (v) => v.toLocaleString("es-ES", { maximumFractionDigits: 1 }) + " %";
+const L = R.losses, M = R.models, M5 = R.models_5_days;
+$("k-eur").textContent = L.lost_eur_year.toLocaleString("es-ES") + " €";
+$("k-eur-d").textContent = `≈ ${L.lost_mwh_year.toLocaleString("es-ES")} MWh/año que pierden ${L.flagged} inversores`;
+$("k-err").textContent = pct(M["Híbrido"].nrmse_pct);
+$("k-inv").textContent = `${L.flagged} de ${R.inverters.length}`;
+$("k-inv-d").textContent = `producen un ${Math.round((1 - R.inverters[0].ratio) * 100)} % y un ${Math.round((1 - R.inverters[1].ratio) * 100)} % menos que sus vecinos`;
+$("k-5").textContent = pct(M5["Híbrido"].nrmse_pct);
+$("k-5ml").textContent = pct(M5["Machine learning"].nrmse_pct);
+
+const ts = R.test_series;
+const days = [...new Set(ts.ts.map((t) => t.slice(0, 10)))];
+const dfmt = (d) => new Date(d + "T12:00").toLocaleDateString("es-ES", { day: "numeric", month: "short" });
+let curDay = days[2];
+function drawDay(d) {
+  curDay = d;
+  const idx = ts.ts.map((t, i) => (t.startsWith(d) ? i : -1)).filter((i) => i >= 0)
+    .filter((i) => { const h = +ts.ts[i].slice(11, 13); return h >= 5 && h <= 19; });
+  const pick = (a) => idx.map((i) => a[i]);
+  const hours = idx.map((i) => +ts.ts[i].slice(11, 13) + +ts.ts[i].slice(14, 16) / 60);
+  Viz.line($("series"), { x: hours, height: 320, xLabel: "Hora", yLabel: "Potencia (MW)", yMin: 0,
+    xFmt: (v) => `${Math.floor(v)}:${String(Math.round((v % 1) * 60)).padStart(2, "0")}`, xTip: (v) => `${Math.floor(v)}:${String(Math.round((v % 1) * 60)).padStart(2, "0")}`,
+    yTip: (v) => v.toLocaleString("es-ES", { maximumFractionDigits: 2 }) + " MW",
+    series: [{ name: "Real", values: pick(ts.real), color: "#c3c2b7", width: 3 },
+             { name: "Físico", values: pick(ts.phys), color: "#3987e5" },
+             { name: "Machine learning", values: pick(ts.ml), color: "#d95926" },
+             { name: "Híbrido", values: pick(ts.hyb), color: "#199e70" }] });
+  document.querySelectorAll("#days .chip").forEach((c) => c.setAttribute("aria-pressed", c.dataset.d === d));
+}
+days.forEach((d) => { const b = document.createElement("button"); b.className = "chip"; b.dataset.d = d; b.textContent = dfmt(d); b.onclick = () => drawDay(d); $("days").appendChild(b); });
+
+let few = false;
+function drawErr() {
+  const src = few ? M5 : M;
+  const cols = { "Físico": "#3987e5", "Machine learning": "#d95926", "Híbrido": "#199e70" };
+  Viz.bars($("err"), { fmt: pct, items: Object.keys(cols).map((k) => ({ label: k, value: src[k].nrmse_pct, color: cols[k] })) });
+  $("full").setAttribute("aria-pressed", !few); $("few").setAttribute("aria-pressed", few);
+  $("err-note").textContent = few
+    ? "Con poco histórico (una planta nueva), el ML puro empeora y el modelo con física se mantiene: la física aporta lo que faltan datos."
+    : "Con datos suficientes, el híbrido es el más preciso y el que menos se desvía en energía total.";
+}
+$("full").onclick = () => { few = false; drawErr(); };
+$("few").onclick = () => { few = true; drawErr(); };
+
+function drawInv() {
+  Viz.bars($("rank"), { fmt: (v) => v.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+    items: R.inverters.slice(0, 10).map((i) => ({ label: i.id + (i.flag ? " ⚠" : ""), value: i.ratio, color: i.flag ? "#d95926" : "#3987e5" })) });
+  const show = R.inverters.slice(0, 8);
+  const h = $("heat"); h.style.gridTemplateColumns = `auto repeat(${R.days.length}, 1fr)`; h.innerHTML = "";
+  show.forEach((inv) => {
+    const n = document.createElement("div"); n.className = "n" + (inv.flag ? " flag" : ""); n.textContent = inv.id; h.appendChild(n);
+    inv.daily.forEach((v, j) => {
+      const c = document.createElement("div"); c.className = "c";
+      const def = v == null ? 0 : Math.max(0, 1 - v), a = Math.min(1, def / 0.1);
+      c.style.background = v == null ? "transparent" : `color-mix(in srgb, #d95926 ${Math.round(a * 100)}%, #2c2c2a)`;
+      c.onmousemove = (ev) => { const t = document.querySelector(".viz-tip") || (Viz.bars(document.createElement("div"), { items: [{ label: "", value: 1 }] }), document.querySelector(".viz-tip"));
+        t.innerHTML = `<b>${inv.id} · ${dfmt(R.days[j])}</b><div>${v == null ? "sin datos" : "Rendimiento relativo: " + v.toLocaleString("es-ES", { maximumFractionDigits: 3 })}</div>`;
+        t.style.opacity = 1; t.style.left = ev.clientX + 14 + "px"; t.style.top = ev.clientY + 14 + "px"; };
+      c.onmouseleave = () => { const t = document.querySelector(".viz-tip"); if (t) t.style.opacity = 0; };
+      h.appendChild(c);
+    });
+  });
+}
+function drawAll() { drawDay(curDay); drawErr(); drawInv(); }
+drawAll();
+addEventListener("resize", () => { clearTimeout(window._rt); window._rt = setTimeout(drawAll, 150); });
+
+const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); } }), { threshold: .15 });
+document.querySelectorAll(".reveal").forEach((e) => io.observe(e));
+
+// Hero background: a sun-path arc of daily production curves
+(function () {
+  const c = $("bg"), x = c.getContext("2d"); let w, h, t = 0;
+  const fit = () => { w = c.width = c.offsetWidth * devicePixelRatio; h = c.height = c.offsetHeight * devicePixelRatio; };
+  fit(); addEventListener("resize", fit);
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  (function draw() {
+    x.clearRect(0, 0, w, h);
+    for (let k = 0; k < 7; k++) {
+      x.beginPath(); x.strokeStyle = `rgba(201,133,0,${0.05 + k * 0.03})`; x.lineWidth = devicePixelRatio * 1.2;
+      const off = ((t * 40 + k * w / 6) % (w * 1.2)) - w * 0.1, width = w * 0.3, amp = h * (0.25 + 0.05 * Math.sin(k));
+      for (let i = 0; i <= 80; i++) {
+        const u = i / 80, px = off + u * width;
+        const py = h * 0.85 - amp * Math.pow(Math.sin(Math.PI * u), 1.5) * (1 - 0.15 * Math.abs(Math.sin(i * 0.7 + k)));
+        i ? x.lineTo(px, py) : x.moveTo(px, py);
+      }
+      x.stroke();
+    }
+    t += 0.004; if (!reduce) requestAnimationFrame(draw);
+  })();
+})();
+</script>
+</body>
+</html>
