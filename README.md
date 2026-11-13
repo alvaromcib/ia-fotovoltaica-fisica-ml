@@ -1,6 +1,8 @@
 # Producción fotovoltaica: física + IA y salud de inversores
 
-**Dashboard interactivo:** `docs/index.html` (publicado con GitHub Pages)
+**Dashboard interactivo:** https://alvaromcib.github.io/ia-fotovoltaica-fisica-ml/
+
+![Dashboard](docs/portfolio/cover.jpg)
 
 Dos cosas que pide cualquier operador de una planta solar:
 
