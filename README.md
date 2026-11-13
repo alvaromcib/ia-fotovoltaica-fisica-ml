@@ -1,47 +1,47 @@
-# Producción fotovoltaica: física + IA y salud de inversores
+# Solar PV production: physics + AI and inverter health
 
-**Dashboard interactivo:** https://alvaromcib.github.io/ia-fotovoltaica-fisica-ml/
+**Interactive dashboard:** [English](https://alvaromcib.github.io/ia-fotovoltaica-fisica-ml/en/) · [Español](https://alvaromcib.github.io/ia-fotovoltaica-fisica-ml/)
 
 ![Dashboard](docs/portfolio/cover.jpg)
 
-Dos cosas que pide cualquier operador de una planta solar:
+Two things every solar plant operator asks for:
 
-1. **¿Cuánto debería estar produciendo?** Modelo de producción esperada a partir de irradiancia y temperatura, comparando un modelo **físico**, uno de **machine learning** y uno **híbrido** (física + ML sobre el residuo).
-2. **¿Qué equipos están perdiendo energía?** Detección de inversores con bajo rendimiento comparando cada uno con sus vecinos en el mismo instante, y estimación de la energía y el dinero que se pierden.
+1. **How much should it be producing?** An expected-production model from irradiance and temperature, comparing a **physical** model, a **machine learning** model and a **hybrid** one (physics + ML on the residual).
+2. **Which units are losing energy?** Detection of underperforming inverters by comparing each one with its neighbours at the same instant, plus an estimate of the energy and money being lost.
 
-Proyecto demostrativo con un dataset público (planta de 22 inversores, 34 días, 15 minutos). No usa datos de clientes.
+Demo project built on a public dataset (22-inverter plant, 34 days, 15-minute data). No client data is used.
 
-## Resultados (10 días de test)
+## Results (10 test days)
 
-| Modelo | nRMSE (24 días de entrenamiento) | nRMSE (solo 5 días) |
+| Model | nRMSE (24 training days) | nRMSE (only 5 days) |
 |---|---|---|
-| Físico (1 parámetro) | 2,7 % | 2,7 % |
-| Machine learning | 2,4 % | 3,2 % |
-| **Híbrido** | **2,3 %** | **2,6 %** |
+| Physical (1 parameter) | 2.7% | 2.7% |
+| Machine learning | 2.4% | 3.2% |
+| **Hybrid** | **2.3%** | **2.6%** |
 
-- Con datos suficientes, el híbrido es el más preciso y el que menos se desvía en energía total.
-- Con poco histórico (una planta recién conectada), el ML puro empeora y el híbrido se mantiene: la física aporta lo que faltan datos.
+- With enough data, the hybrid is the most accurate and the one that deviates least in total energy.
+- With little history (a newly connected plant), pure ML gets worse while the hybrid holds up: physics supplies what the data lacks.
 
-**Salud de inversores:** 2 de 22 inversores producen un 8 % y un 7 % menos que la mediana de la planta de forma sostenida. Extrapolado a un año, unos 505 MWh, **≈ 30.000 €/año** con un precio supuesto de 60 €/MWh.
+**Inverter health:** 2 of 22 inverters consistently produce 8% and 7% less than the plant median. Extrapolated to a year, that is about 505 MWh, **≈ €30,000/year** at an assumed price of €60/MWh.
 
-> El modelo usa irradiancia medida, así que estima la producción esperada (útil para detectar pérdidas). Alimentado con previsión meteorológica sirve para prever producción, con un error mayor que depende de la calidad de esa previsión.
+> The model uses measured irradiance, so it estimates expected production (useful for detecting losses). Fed with a weather forecast it can forecast production, with a larger error that depends on the quality of that forecast.
 
-## Cómo ejecutarlo
+## How to run it
 
 ```bash
 pip install -r requirements.txt
-python src/train.py          # modelos, métricas y salud de inversores -> results/results.json
-python shared/build.py .     # regenera docs/index.html
+python src/train.py          # models, metrics and inverter health -> results/results.json
+python shared/build.py .     # rebuilds docs/index.html (ES) and docs/en/index.html (EN)
 ```
 
-## Cómo se aplicaría en una planta
+## How it would apply in a plant
 
-- Datos de SCADA (inversores, string boxes) y estación meteorológica de la planta.
-- Línea base de producción esperada por equipo y alertas cuando un inversor o string se desvía.
-- Cuantificación de pérdidas en MWh y € para priorizar intervenciones de O&M.
+- SCADA data (inverters, string boxes) and the plant's weather station.
+- An expected-production baseline per unit, with alerts when an inverter or string drifts.
+- Losses quantified in MWh and € to prioritise O&M interventions.
 
 ---
 
-**Álvaro Martín Coll** · Físico · Ingeniero de IA para industria y energía · [Perfil en Malt](https://www.malt.com/profile/alvaromartincoll)
+**Álvaro Martín Coll** · Physicist · AI engineer for industry and energy · [Malt profile](https://www.malt.com/profile/alvaromartincoll)
 
-Datos: *Solar Power Generation Data* (A. Kannal), publicado en Kaggle; planta 1.
+Data: *Solar Power Generation Data* (A. Kannal), published on Kaggle; plant 1.

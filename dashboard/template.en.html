@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Solar PV production: physics + AI · Álvaro Martín Coll</title>
+<style>/*CSS*/</style>
+<style>
+:root { --accent: #c98500; }
+.cta { color: #0b0b0b; }
+.chip[aria-pressed="true"] { color: #0b0b0b; }
+.heat { display: grid; gap: 2px; font-size: 11px; }
+.heat .c { height: 18px; border-radius: 3px; }
+.heat .n { color: var(--text-2); padding-right: 8px; white-space: nowrap; line-height: 18px; }
+.heat .flag { color: var(--text-1); font-weight: 600; }
+.scale { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-3); margin-top: 10px; }
+.scale span.g { width: 140px; height: 8px; border-radius: 4px; background: linear-gradient(90deg, #2c2c2a, #d95926); }
+</style>
+</head>
+<body>
+<header class="hero">
+  <canvas id="bg"></canvas>
+  <div class="wrap">
+    <div class="eyebrow">Demo case · Solar PV</div>
+    <h1>How much your solar plant should produce, and which inverters aren't delivering</h1>
+    <p class="lede">An expected-production model for a 22-inverter PV plant that combines physics and machine learning,
+      and flags the units that underperform the rest, along with the energy lost because of it.</p>
+    <div class="tags"><span class="tag">Physical model</span><span class="tag">LightGBM</span><span class="tag">Hybrid modelling</span><span class="tag">Anomaly detection</span><span class="tag">Public data</span></div>
+  </div>
+</header>
+<main class="wrap">
+  <section class="kpis reveal">
+    <div class="kpi hero-kpi"><div class="l">Recoverable energy per year (estimate)</div><div class="v" id="k-eur"></div><div class="d" id="k-eur-d"></div></div>
+    <div class="kpi"><div class="l">Hybrid model error</div><div class="v" id="k-err"></div><div class="d">nRMSE over plant power</div></div>
+    <div class="kpi"><div class="l">Underperforming inverters</div><div class="v" id="k-inv"></div><div class="d" id="k-inv-d"></div></div>
+    <div class="kpi"><div class="l">With only 5 days of data</div><div class="v" id="k-5"></div><div class="d">hybrid error; pure ML rises to <span id="k-5ml"></span></div></div>
+  </section>
+
+  <section class="grid">
+    <div class="card span-8 reveal">
+      <h2>Actual production vs models</h2>
+      <p class="sub">Test days the models never saw. Pick a day; hover to see the values.</p>
+      <div class="controls" id="days"></div>
+      <div class="legend"><span><i style="background:var(--text-2)"></i>Actual</span><span><i style="background:var(--s1)"></i>Physical</span><span><i style="background:var(--s2)"></i>Machine learning</span><span><i style="background:var(--s3)"></i>Hybrid</span></div>
+      <div id="series"></div>
+    </div>
+    <div class="card span-4 reveal">
+      <h2>Error by model</h2>
+      <p class="sub">nRMSE during daylight hours (lower is better).</p>
+      <div class="controls"><button class="chip" id="full" aria-pressed="true">24 training days</button><button class="chip" id="few" aria-pressed="false">Only 5 days</button></div>
+      <div id="err"></div>
+      <p class="note" id="err-note"></p>
+    </div>
+
+    <div class="card span-6 reveal">
+      <h2>Performance of each inverter</h2>
+      <p class="sub">Production relative to the plant's median inverter, in daylight (1.00 = normal).</p>
+      <div id="rank"></div>
+    </div>
+    <div class="card span-6 reveal">
+      <h2>Day by day: where energy is lost</h2>
+      <p class="sub">Daily shortfall of each inverter against the median. The more intense, the more it loses.</p>
+      <div class="heat" id="heat"></div>
+      <div class="scale">0%<span class="g"></span>10% or more shortfall</div>
+    </div>
+
+    <div class="card reveal">
+      <h2>How it was built</h2>
+      <p class="sub">The approach I use with real plant data.</p>
+      <div class="steps">
+        <div class="step"><b>Physics first</b>Power proportional to irradiance, corrected for module temperature (−0.4%/°C). A single fitted parameter.</div>
+        <div class="step"><b>ML on the residual</b>LightGBM learns what physics doesn't explain: shading, inverter clipping, soiling, time of day.</div>
+        <div class="step"><b>Honest validation</b>The last 10 days are kept out of training. An extra test with only 5 days of history.</div>
+        <div class="step"><b>Inverter health</b>Each inverter against its neighbours at the same instant: separates equipment faults from weather effects.</div>
+      </div>
+      <p class="note" style="margin-top:14px">The model uses measured irradiance, so it estimates expected production. Fed with a weather forecast it can forecast production, with a larger error that depends on the quality of that forecast.</p>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div><b>Álvaro Martín Coll</b> · Physicist · AI engineer for industry and energy<br>
+      <span class="note">Data: public PV generation dataset (22 inverters, 34 days). Assumed energy price: €60/MWh. Demo project, no client data.</span></div>
+    <div><a class="cta" href="{{MALT_URL}}">Let's talk about your plant</a></div>
+  </footer>
+</main>
+<script>/*VIZ*/</script>
+<script>
+const R = /*DATA*/;
+const $ = (id) => document.getElementById(id);
+const pct = (v) => v.toLocaleString("en-US", { maximumFractionDigits: 1 }) + "%";
+const NAME = { "Físico": "Physical", "Machine learning": "Machine learning", "Híbrido": "Hybrid" };
+const L = R.losses, M = R.models, M5 = R.models_5_days;
+$("k-eur").textContent = "€" + L.lost_eur_year.toLocaleString("en-US");
+$("k-eur-d").textContent = `≈ ${L.lost_mwh_year.toLocaleString("en-US")} MWh/year lost by ${L.flagged} inverters`;
+$("k-err").textContent = pct(M["Híbrido"].nrmse_pct);
+$("k-inv").textContent = `${L.flagged} of ${R.inverters.length}`;
+$("k-inv-d").textContent = `produce ${Math.round((1 - R.inverters[0].ratio) * 100)}% and ${Math.round((1 - R.inverters[1].ratio) * 100)}% less than their neighbours`;
+$("k-5").textContent = pct(M5["Híbrido"].nrmse_pct);
+$("k-5ml").textContent = pct(M5["Machine learning"].nrmse_pct);
+
+const ts = R.test_series;
+const days = [...new Set(ts.ts.map((t) => t.slice(0, 10)))];
+const dfmt = (d) => new Date(d + "T12:00").toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+let curDay = days[2];
+function drawDay(d) {
+  curDay = d;
+  const idx = ts.ts.map((t, i) => (t.startsWith(d) ? i : -1)).filter((i) => i >= 0)
+    .filter((i) => { const h = +ts.ts[i].slice(11, 13); return h >= 5 && h <= 19; });
+  const pick = (a) => idx.map((i) => a[i]);
+  const hours = idx.map((i) => +ts.ts[i].slice(11, 13) + +ts.ts[i].slice(14, 16) / 60);
+  Viz.line($("series"), { x: hours, height: 320, xLabel: "Time of day", yLabel: "Power (MW)", yMin: 0,
+    xFmt: (v) => `${Math.floor(v)}:${String(Math.round((v % 1) * 60)).padStart(2, "0")}`, xTip: (v) => `${Math.floor(v)}:${String(Math.round((v % 1) * 60)).padStart(2, "0")}`,
+    yTip: (v) => v.toLocaleString("en-US", { maximumFractionDigits: 2 }) + " MW",
+    series: [{ name: "Actual", values: pick(ts.real), color: "#c3c2b7", width: 3 },
+             { name: "Physical", values: pick(ts.phys), color: "#3987e5" },
+             { name: "Machine learning", values: pick(ts.ml), color: "#d95926" },
+             { name: "Hybrid", values: pick(ts.hyb), color: "#199e70" }] });
+  document.querySelectorAll("#days .chip").forEach((c) => c.setAttribute("aria-pressed", c.dataset.d === d));
+}
+days.forEach((d) => { const b = document.createElement("button"); b.className = "chip"; b.dataset.d = d; b.textContent = dfmt(d); b.onclick = () => drawDay(d); $("days").appendChild(b); });
+
+let few = false;
+function drawErr() {
+  const src = few ? M5 : M;
+  const cols = { "Físico": "#3987e5", "Machine learning": "#d95926", "Híbrido": "#199e70" };
+  Viz.bars($("err"), { fmt: pct, items: Object.keys(cols).map((k) => ({ label: NAME[k], value: src[k].nrmse_pct, color: cols[k] })) });
+  $("full").setAttribute("aria-pressed", !few); $("few").setAttribute("aria-pressed", few);
+  $("err-note").textContent = few
+    ? "With little history (a new plant), pure ML gets worse while the physics-based model holds up: physics supplies what the data lacks."
+    : "With enough data, the hybrid is the most accurate and the one that deviates least in total energy.";
+}
+$("full").onclick = () => { few = false; drawErr(); };
+$("few").onclick = () => { few = true; drawErr(); };
+
+function drawInv() {
+  Viz.bars($("rank"), { fmt: (v) => v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+    items: R.inverters.slice(0, 10).map((i) => ({ label: i.id + (i.flag ? " ⚠" : ""), value: i.ratio, color: i.flag ? "#d95926" : "#3987e5" })) });
+  const show = R.inverters.slice(0, 8);
+  const h = $("heat"); h.style.gridTemplateColumns = `auto repeat(${R.days.length}, 1fr)`; h.innerHTML = "";
+  show.forEach((inv) => {
+    const n = document.createElement("div"); n.className = "n" + (inv.flag ? " flag" : ""); n.textContent = inv.id; h.appendChild(n);
+    inv.daily.forEach((v, j) => {
+      const c = document.createElement("div"); c.className = "c";
+      const def = v == null ? 0 : Math.max(0, 1 - v), a = Math.min(1, def / 0.1);
+      c.style.background = v == null ? "transparent" : `color-mix(in srgb, #d95926 ${Math.round(a * 100)}%, #2c2c2a)`;
+      c.onmousemove = (ev) => { const t = document.querySelector(".viz-tip") || (Viz.bars(document.createElement("div"), { items: [{ label: "", value: 1 }] }), document.querySelector(".viz-tip"));
+        t.innerHTML = `<b>${inv.id} · ${dfmt(R.days[j])}</b><div>${v == null ? "no data" : "Relative performance: " + v.toLocaleString("en-US", { maximumFractionDigits: 3 })}</div>`;
+        t.style.opacity = 1; t.style.left = ev.clientX + 14 + "px"; t.style.top = ev.clientY + 14 + "px"; };
+      c.onmouseleave = () => { const t = document.querySelector(".viz-tip"); if (t) t.style.opacity = 0; };
+      h.appendChild(c);
+    });
+  });
+}
+function drawAll() { drawDay(curDay); drawErr(); drawInv(); }
+drawAll();
+addEventListener("resize", () => { clearTimeout(window._rt); window._rt = setTimeout(drawAll, 150); });
+
+const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); } }), { threshold: .15 });
+document.querySelectorAll(".reveal").forEach((e) => io.observe(e));
+
+// Hero background: a sun-path arc of daily production curves
+(function () {
+  const c = $("bg"), x = c.getContext("2d"); let w, h, t = 0;
+  const fit = () => { w = c.width = c.offsetWidth * devicePixelRatio; h = c.height = c.offsetHeight * devicePixelRatio; };
+  fit(); addEventListener("resize", fit);
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  (function draw() {
+    x.clearRect(0, 0, w, h);
+    for (let k = 0; k < 7; k++) {
+      x.beginPath(); x.strokeStyle = `rgba(201,133,0,${0.05 + k * 0.03})`; x.lineWidth = devicePixelRatio * 1.2;
+      const off = ((t * 40 + k * w / 6) % (w * 1.2)) - w * 0.1, width = w * 0.3, amp = h * (0.25 + 0.05 * Math.sin(k));
+      for (let i = 0; i <= 80; i++) {
+        const u = i / 80, px = off + u * width;
+        const py = h * 0.85 - amp * Math.pow(Math.sin(Math.PI * u), 1.5) * (1 - 0.15 * Math.abs(Math.sin(i * 0.7 + k)));
+        i ? x.lineTo(px, py) : x.moveTo(px, py);
+      }
+      x.stroke();
+    }
+    t += 0.004; if (!reduce) requestAnimationFrame(draw);
+  })();
+})();
+</script>
+</body>
+</html>
